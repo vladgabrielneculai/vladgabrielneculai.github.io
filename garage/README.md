@@ -21,7 +21,9 @@ npm run dev
 
 With `npm run dev` running, open <http://localhost:5173/?edit>. The form edits your profile, experience, projects and skills, and **Save** writes `src/content.json`. Commit and push to publish. The editor exists only in development; it is not in the built site. You can also edit `src/content.json` by hand.
 
-`npm run build` type-checks and writes a static site to `dist/` (relative paths, so it can be served from any folder).
+## Publish
+
+`npm run publish-site` builds the site and copies it to the repository root, which GitHub Pages serves. Commit and push to `main` afterwards.
 
 ## Where things live
 
