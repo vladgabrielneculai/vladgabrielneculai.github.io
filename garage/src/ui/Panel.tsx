@@ -61,8 +61,8 @@ function Projects() {
             <h3 className="text-base font-extrabold tracking-tight">{b.name}</h3>
             <span className="label">{b.year}</span>
           </div>
-          <p className="label mt-0.5 !text-accent">{b.kind}</p>
-          <p className="mt-2 text-sm leading-relaxed text-ink/70">{b.blurb}</p>
+          {b.type && <p className="label mt-0.5 !text-accent">{b.type}</p>}
+          {b.blurb && <p className="mt-2 text-sm leading-relaxed text-ink/70">{b.blurb}</p>}
           <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[11px] text-ink/60">
             {b.tags.map((t) => (
               <span key={t} className="rounded-full bg-ink/6 px-2.5 py-1">
