@@ -1,4 +1,4 @@
-import { builds, history, profile, skills, tabs, type Tab } from '../data'
+import { experience, profile, projects, skills, tabs, type Tab } from '../data'
 import { useStore } from '../store'
 
 function About() {
@@ -10,17 +10,17 @@ function About() {
         </p>
       ))}
       <dl className="mt-5 border-t border-line text-sm">
-        {profile.specs.map(([k, v]) => (
-          <div key={k} className="flex gap-4 border-b border-line py-2.5">
-            <dt className="label w-16 shrink-0 pt-0.5">{k}</dt>
-            <dd>{v}</dd>
+        {profile.specs.map((s) => (
+          <div key={s.label} className="flex gap-4 border-b border-line py-2.5">
+            <dt className="label w-16 shrink-0 pt-0.5">{s.label}</dt>
+            <dd>{s.value}</dd>
           </div>
         ))}
       </dl>
       <ul className="mt-4 flex flex-wrap gap-2 text-xs">
-        {profile.languages.map(([l, lvl]) => (
-          <li key={l} className="rounded-full border border-line px-3 py-1.5 text-ink/60">
-            <span className="font-semibold text-ink">{l}</span> · {lvl}
+        {profile.languages.map((l) => (
+          <li key={l.name} className="rounded-full border border-line px-3 py-1.5 text-ink/60">
+            <span className="font-semibold text-ink">{l.name}</span> · {l.level}
           </li>
         ))}
       </ul>
@@ -31,7 +31,7 @@ function About() {
 function Experience() {
   return (
     <ol className="relative border-l border-line pl-5">
-      {history.map((h) => (
+      {experience.map((h) => (
         <li key={h.when + h.title} className="relative mb-5 last:mb-0">
           <span className={`absolute -left-[1.56rem] top-1.5 h-2 w-2 rounded-full ${h.kind === 'work' ? 'bg-accent' : 'border-2 border-accent bg-white'}`} />
           <p className="label">
@@ -55,7 +55,7 @@ function Experience() {
 function Projects() {
   return (
     <ul className="space-y-3">
-      {builds.map((b) => (
+      {projects.map((b) => (
         <li key={b.name} className="rounded-xl border border-line p-4">
           <div className="flex items-baseline justify-between gap-4">
             <h3 className="text-base font-extrabold tracking-tight">{b.name}</h3>
