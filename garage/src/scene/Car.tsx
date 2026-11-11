@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { tabs } from '../data'
 import { useStore, zones, type Part, type Zone } from '../store'
+import { ROOM } from './Garage'
 
 const MODEL = `${import.meta.env.BASE_URL}models/mazda3.glb`
 
@@ -119,6 +120,35 @@ function glowTexture() {
   return t
 }
 
+// The lamp texture is one atlas for every lamp on the car. This picks out what actually
+// emits light with the lights on: the white headlamp optics, and at the rear only the red
+// rings. The discs inside the rings are the indicator / reversing lamps and stay dark, as
+// do the reflectors and the high-level brake light.
+function lampEmissive(map: THREE.Texture) {
+  const S = 512
+  const out = canvas(S, S, (g) => {
+    g.drawImage(map.image as CanvasImageSource, 0, 0, S, S)
+    const img = g.getImageData(0, 0, S, S)
+    const d = img.data
+    for (let y = 0; y < S; y++) {
+      for (let x = 0; x < S; x++) {
+        const i = (y * S + x) * 4
+        const [r, gr, b] = [d[i], d[i + 1], d[i + 2]]
+        const red = r > 90 && gr < 70 && b < 70 && Math.hypot(x - 362, y - 385) < 172
+        const white = r > 120 && gr > 120 && b > 120 && x > 205 && y < 300 && Math.hypot(x - 362, y - 352) > 76
+        d[i] = red ? 255 : white ? r : 0
+        d[i + 1] = white ? gr : red ? 18 : 0
+        d[i + 2] = white ? b : red ? 10 : 0
+      }
+    }
+    g.putImageData(img, 0, 0)
+  })
+  out.channel = map.channel
+  out.wrapS = map.wrapS
+  out.wrapT = map.wrapT
+  return out
+}
+
 // Where a lamp cluster faces outwards on each side: the average of its most forward
 // (dir = 1) or most rearward (dir = -1) vertices.
 function lampPoints(meshes: THREE.Mesh[], dir: 1 | -1) {
@@ -203,8 +233,6 @@ function rig(scene: THREE.Object3D) {
   const redLens = new THREE.MeshPhysicalMaterial({
     name: 'RedLens',
     color: '#8f0a0c',
-    emissive: '#ff1a0e',
-    emissiveIntensity: 0,
     roughness: 0.05,
     clearcoat: 1,
     transparent: true,
@@ -214,7 +242,8 @@ function rig(scene: THREE.Object3D) {
   const disc = discTextures()
   const discMat = new THREE.MeshStandardMaterial({ name: 'Disc', map: disc.map, roughnessMap: disc.orm, metalnessMap: disc.orm, roughness: 1, metalness: 1, envMapIntensity: 1.2 })
   const caliper = new THREE.MeshPhysicalMaterial({ name: 'Caliper', color: '#b1121d', roughness: 0.35, metalness: 0.1, clearcoat: 1, clearcoatRoughness: 0.1 })
-  const chrome = new THREE.MeshStandardMaterial({ name: 'Chrome', color: '#f4f5f6', metalness: 1, roughness: 0.04, envMapIntensity: 1.5 })
+  // Wheels: silver-painted alloy. The centre cap keeps its chrome.
+  const alloy = new THREE.MeshPhysicalMaterial({ name: 'Alloy', color: '#c4c7cb', metalness: 0.92, roughness: 0.3, clearcoat: 0.6, clearcoatRoughness: 0.15, envMapIntensity: 1.15 })
   const chromeDark = new THREE.MeshStandardMaterial({ name: 'ChromeDark', color: '#9a9da1', metalness: 1, roughness: 0.1, envMapIntensity: 1.3 })
 
   let lampMat: Mat | null = null
@@ -227,7 +256,7 @@ function rig(scene: THREE.Object3D) {
     // The same "black glass" is the clear cover of the lamps and emblem, and the black
     // band printed round the windows.
     else if (n.includes('Glass_Out_074')) m.material = /SM_Light_F|SM_Bumper_F|SideMirror/.test(m.name) ? lens : frit
-    else if (n.includes('Rim_Silver')) m.material = chrome
+    else if (n.includes('Rim_Silver')) m.material = alloy
     else if (n.includes('Rim_Dark')) m.material = chromeDark
     else if (n.includes('Brake')) {
       // Discs are the thin round parts; everything else on that material is a caliper.
@@ -245,7 +274,7 @@ function rig(scene: THREE.Object3D) {
         old.roughness = 0.2
         old.metalness = 0.4
         old.emissive.set('#ffffff')
-        old.emissiveMap = old.map
+        old.emissiveMap = old.map ? lampEmissive(old.map) : null
         lampMat = old
       } else if (n.includes('Tyre')) {
         old.roughness = 0.88
@@ -285,8 +314,8 @@ function rig(scene: THREE.Object3D) {
     beams.push(beam)
   }
   for (const p of lampPoints([...lampMeshes('SM_Light_B'), ...lampMeshes('SK_Trunk')], -1)) {
-    flares.push(flare(p, new THREE.Color(2.6, 0.12, 0.08), 0.42))
-    const l = new THREE.PointLight('#ff2010', 0, 3.2, 2)
+    // No flare at the rear: the lit rings themselves are the tail lamps.
+    const l = new THREE.PointLight('#ff2010', 0, 2.6, 2)
     l.position.set(p.x, p.y, p.z - 0.25)
     car.add(l)
     spill.push(l)
@@ -311,6 +340,12 @@ function rig(scene: THREE.Object3D) {
     list.forEach((m) => p.attach(m))
     pivots[part] = p
   }
+  // The door mirrors are separate parts in the model; hang each on its front door.
+  for (const m of named('SM_SideMirror')) {
+    const left = c([m]).x > 0
+    const door = [pivots.doorFL, pivots.doorFR].find((d) => (d.userData.side > 0) === left)
+    door?.attach(m)
+  }
 
   // --- Wheels: one pivot per tyre, collecting the rim and brake that sit inside it.
   const wheelsRoot = new THREE.Group()
@@ -328,12 +363,33 @@ function rig(scene: THREE.Object3D) {
     return { pivot: p, side: Math.sign(centre.x) }
   })
 
-  return { car, wheelsRoot, pivots, wheels, lampMat: lampMat as Mat | null, redLens, flares, beams, spill }
+  // A spare wheel for the garage: one of the car's own, without its brake.
+  const spare = wheels[0].pivot.clone(true)
+  spare.name = 'spare'
+  spare.position.set(0, 0, 0)
+  spare.children.filter((o) => (o as THREE.Mesh).material === discMat || (o as THREE.Mesh).material === caliper).forEach((o) => spare.remove(o))
+  const tyreRadius = boxOf([tyres[0]]).getSize(new THREE.Vector3()).y / 2
+  const tyreWidth = boxOf([tyres[0]]).getSize(new THREE.Vector3()).x
+
+  return { car, wheelsRoot, pivots, wheels, lampMat: lampMat as Mat | null, flares, beams, spill, spare, tyreRadius, tyreWidth }
 }
 
 function zoneOf(o: THREE.Object3D | null): Zone | null {
   for (; o; o = o.parent) if (o.name in zones) return o.name as Zone
   return null
+}
+
+// A second set of wheels in the corner: three stacked flat, one leaning on the wall.
+function SpareWheels({ wheel, radius, width }: { wheel: THREE.Object3D; radius: number; width: number }) {
+  const copies = useMemo(() => [0, 1, 2, 3].map(() => wheel.clone(true)), [wheel])
+  return (
+    <group position={[-ROOM.x + 1.5, 0, ROOM.z - 1.3]}>
+      {copies.slice(0, 3).map((o, i) => (
+        <primitive key={i} object={o} position={[i === 1 ? 0.03 : 0, width / 2 + i * (width + 0.004), i === 2 ? 0.025 : 0]} rotation={[0, i * 0.7, Math.PI / 2]} />
+      ))}
+      <primitive object={copies[3]} position={[1.05, radius, 1.3 - width / 2 - 0.09]} rotation={[0.16, Math.PI / 2, 0]} />
+    </group>
+  )
 }
 
 export function Car() {
@@ -362,11 +418,10 @@ export function Car() {
     for (const w of r.wheels) w.pivot.rotation.z = w.side * a.camber
 
     easing.damp(a, 'lights', s.lights ? 1 : 0, 0.12, dt)
-    if (r.lampMat) r.lampMat.emissiveIntensity = 0.02 + a.lights * 3.2
-    r.redLens.emissiveIntensity = a.lights * 1.4
+    if (r.lampMat) r.lampMat.emissiveIntensity = a.lights * 3.4
     for (const f of r.flares) f.opacity = a.lights
     for (const b of r.beams) b.intensity = a.lights * 42
-    for (const l of r.spill) l.intensity = a.lights * 2.2
+    for (const l of r.spill) l.intensity = a.lights * 0.3
   })
 
   const onMove = (e: ThreeEvent<PointerEvent>) => {
@@ -394,6 +449,7 @@ export function Car() {
     <group onPointerMove={onMove} onPointerOut={onOut} onPointerDown={onDown} onClick={onClick}>
       <primitive object={r.car} />
       <primitive object={r.wheelsRoot} />
+      <SpareWheels wheel={r.spare} radius={r.tyreRadius} width={r.tyreWidth} />
     </group>
   )
 }

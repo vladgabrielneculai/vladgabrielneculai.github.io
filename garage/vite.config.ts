@@ -4,9 +4,9 @@ import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
-// Dev-only: lets the /?edit page save src/content.json. Never part of a build.
+// Dev-only: lets the /?edit page save public/content.json without a GitHub token.
 function contentEditor(): Plugin {
-  const file = fileURLToPath(new URL('./src/content.json', import.meta.url))
+  const file = fileURLToPath(new URL('./public/content.json', import.meta.url))
   return {
     name: 'content-editor',
     apply: 'serve',
