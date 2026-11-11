@@ -1,0 +1,263 @@
+@import 'tailwindcss';
+
+@theme inline {
+  --font-sans: 'Manrope Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, Menlo, monospace;
+  --color-ink: #14161a;
+  --color-paper: #eef0f2;
+  --color-line: rgb(20 22 26 / 0.1);
+  --color-accent: #b1121d;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* One screen, nothing scrolls except the inside of the content panel. */
+body {
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  /* Studio backdrop: a pool of light on the floor under the car, falling off to the walls. */
+  background: radial-gradient(ellipse 75% 60% at 50% 66%, #fdfdfe 0%, #eceef0 45%, #d3d6da 100%);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+button {
+  cursor: pointer;
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgb(20 22 26 / 0.5);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.7rem 1.2rem;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--color-accent);
+  border-radius: 999px;
+  transition:
+    background 0.2s,
+    color 0.2s;
+}
+.btn:hover {
+  background: #8e0c16;
+}
+.btn-quiet {
+  color: var(--color-ink);
+  background: rgb(255 255 255 / 0.85);
+  border: 1px solid var(--color-line);
+  backdrop-filter: blur(8px);
+}
+.btn-quiet:hover {
+  color: #fff;
+  background: var(--color-ink);
+}
+
+.intro {
+  position: fixed;
+  z-index: 20;
+  left: 1rem;
+  right: 1rem;
+  bottom: 9.4rem;
+  transition:
+    opacity 0.35s,
+    transform 0.35s;
+}
+
+.hint {
+  position: fixed;
+  z-index: 20;
+  top: 1rem;
+  left: 50%;
+  translate: -50% 0;
+  max-width: calc(100vw - 2rem);
+  padding: 0.45rem 0.9rem;
+  font-size: 12px;
+  color: rgb(20 22 26 / 0.7);
+  text-align: center;
+  background: rgb(255 255 255 / 0.8);
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+  transition: opacity 0.25s;
+}
+
+.tabs {
+  position: fixed;
+  z-index: 40;
+  left: 50%;
+  bottom: 0.75rem;
+  translate: -50% 0;
+  display: flex;
+  gap: 0.15rem;
+  max-width: calc(100vw - 1rem);
+  padding: 0.3rem;
+  overflow-x: auto;
+  background: rgb(255 255 255 / 0.88);
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  box-shadow: 0 10px 30px rgb(20 22 26 / 0.1);
+  backdrop-filter: blur(12px);
+  scrollbar-width: none;
+}
+.tab {
+  padding: 0.55rem 0.85rem;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: rgb(20 22 26 / 0.6);
+  border-radius: 999px;
+  transition:
+    background 0.2s,
+    color 0.2s;
+}
+.tab:hover {
+  color: var(--color-ink);
+}
+.tab-on,
+.tab-on:hover {
+  color: #fff;
+  background: var(--color-accent);
+}
+
+/* Content panel: bottom sheet on phones, side card on desktop. */
+.panel {
+  position: fixed;
+  z-index: 30;
+  left: 0.5rem;
+  right: 0.5rem;
+  bottom: 4.2rem;
+  height: 52svh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: rgb(255 255 255 / 0.94);
+  border: 1px solid var(--color-line);
+  border-radius: 1.25rem;
+  box-shadow: 0 24px 60px rgb(20 22 26 / 0.16);
+  backdrop-filter: blur(16px);
+  opacity: 0;
+  transform: translateY(24px);
+  pointer-events: none;
+  transition:
+    opacity 0.3s,
+    transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.panel-open {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+.panel-body {
+  padding: 1.25rem;
+  animation: rise 0.35s ease both;
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@media (min-width: 768px) {
+  .intro {
+    left: 2rem;
+    right: auto;
+    bottom: 6.5rem;
+  }
+  .hint {
+    top: 1.5rem;
+  }
+  .tabs {
+    bottom: 1.5rem;
+  }
+  .tab {
+    padding: 0.6rem 1.15rem;
+    font-size: 14px;
+  }
+  .panel {
+    top: 5.5rem;
+    right: 2rem;
+    bottom: 6rem;
+    left: auto;
+    width: min(27rem, 36vw);
+    height: auto;
+    transform: translateX(24px);
+  }
+  .panel-open {
+    transform: none;
+  }
+  .panel-body {
+    padding: 1.75rem;
+  }
+}
+
+input[type='range'] {
+  width: 100%;
+  height: 16px;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+input[type='range']::-webkit-slider-runnable-track {
+  height: 3px;
+  background: rgb(20 22 26 / 0.15);
+  border-radius: 3px;
+}
+input[type='range']::-moz-range-track {
+  height: 3px;
+  background: rgb(20 22 26 / 0.15);
+  border-radius: 3px;
+}
+input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6.5px;
+  background: var(--color-accent);
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.3);
+}
+input[type='range']::-moz-range-thumb {
+  width: 11px;
+  height: 11px;
+  background: var(--color-accent);
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
