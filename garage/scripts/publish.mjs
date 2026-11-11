@@ -8,8 +8,8 @@ const dist = fileURLToPath(new URL('../dist/', import.meta.url))
 const root = fileURLToPath(new URL('../../', import.meta.url))
 if (!existsSync(dist + 'index.html')) throw new Error('No build found. Run `npm run build` first.')
 
-// Only ever touches these four generated paths at the root.
-for (const name of ['assets', 'models', 'index.html', 'favicon.png']) {
+// Only ever touches these generated paths at the root.
+for (const name of ['assets', 'models', 'index.html', 'favicon.png', 'content.json']) {
   rmSync(root + name, { recursive: true, force: true })
   cpSync(dist + name, root + name, { recursive: true })
 }

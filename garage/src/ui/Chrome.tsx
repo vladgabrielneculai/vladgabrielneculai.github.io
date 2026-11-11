@@ -96,8 +96,8 @@ export function Chrome({ webgl }: { webgl: boolean }) {
         </button>
       </div>
 
-      <div role="status" className={`hint ${hint || (home && webgl) ? 'opacity-100' : 'opacity-0'}`}>
-        {hint ?? 'Drag to turn the car · click the bonnet, a door, a wheel or the boot'}
+      <div role="status" className={`hint ${hint || ((home || tab === 'about') && webgl) ? 'opacity-100' : 'opacity-0'}`}>
+        {hint ?? (tab === 'about' ? 'You are in the driver’s seat · drag to look around' : 'Drag to turn the car · click the bonnet, a door, a wheel or the boot')}
       </div>
 
       <nav className="tabs" aria-label="Sections">

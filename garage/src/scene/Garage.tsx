@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { intro } from '../store'
+import { Props } from './Props'
 
 export const ROOM = { x: 12, z: 13, h: 4.2 }
 const BARS = [-8, -4, 0, 4, 8] // ceiling light strips, back to front
@@ -87,19 +88,7 @@ function useTextures() {
       }
       grain(g, 512, 512, 5000, 0.04)
     })
-    // Tool chest front: drawers with pull bars.
-    const chest = tex(256, 256, (g) => {
-      g.fillStyle = '#a3101a'
-      g.fillRect(0, 0, 256, 256)
-      for (let d = 0; d < 6; d++) {
-        const y = 6 + d * 42
-        g.fillStyle = 'rgba(0,0,0,0.35)'
-        g.fillRect(6, y + 36, 244, 3)
-        g.fillStyle = '#c9ccd0'
-        g.fillRect(20, y + 6, 216, 5)
-      }
-    })
-    return { side: wall(6), end: wall(5.5), door, chest }
+    return { side: wall(6), end: wall(5.5), door }
   }, [])
 }
 
@@ -224,39 +213,7 @@ export function Garage() {
         ))}
       </group>
 
-      {/* Tool chest */}
-      <group position={[-7.4, 0, -ROOM.z + 0.45]}>
-        <mesh position={[0, 0.52, 0]}>
-          <boxGeometry args={[1.5, 0.84, 0.6]} />
-          <meshStandardMaterial color="#a3101a" roughness={0.35} metalness={0.4} />
-        </mesh>
-        <mesh position={[0, 0.52, 0.302]}>
-          <planeGeometry args={[1.5, 0.84]} />
-          <meshStandardMaterial map={t.chest} roughness={0.35} metalness={0.4} />
-        </mesh>
-        <mesh position={[0, 1.2, -0.05]}>
-          <boxGeometry args={[1.5, 0.5, 0.5]} />
-          <meshStandardMaterial color="#a3101a" roughness={0.35} metalness={0.4} />
-        </mesh>
-        <mesh position={[0, 1.2, 0.202]}>
-          <planeGeometry args={[1.5, 0.5]} />
-          <meshStandardMaterial map={t.chest} roughness={0.35} metalness={0.4} />
-        </mesh>
-        <mesh position={[0, 0.05, 0]}>
-          <boxGeometry args={[1.4, 0.1, 0.5]} />
-          <meshStandardMaterial color="#111" roughness={0.8} />
-        </mesh>
-      </group>
-
-      {/* Spare tyres */}
-      <group position={[7.6, 0, -ROOM.z + 0.9]}>
-        {[0, 1, 2, 3].map((k) => (
-          <mesh key={k} position={[k % 2 ? 0.02 : -0.02, 0.12 + k * 0.235, 0]} rotation-x={Math.PI / 2}>
-            <torusGeometry args={[0.215, 0.118, 20, 48]} />
-            <meshStandardMaterial color="#141414" roughness={0.92} />
-          </mesh>
-        ))}
-      </group>
+      <Props room={ROOM} />
 
       <hemisphereLight args={['#ffffff', '#3a3c40', 0.12]} />
     </>
