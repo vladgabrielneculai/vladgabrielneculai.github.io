@@ -3,7 +3,8 @@ import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { easing } from 'maath'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { partLabel, useStore, type Part } from '../store'
+import { tabs } from '../data'
+import { useStore, zones, type Part, type Zone } from '../store'
 
 const MODEL = `${import.meta.env.BASE_URL}models/mazda3.glb`
 
@@ -87,6 +88,7 @@ function rig(scene: THREE.Object3D) {
   const wheels = tyres.map((t) => {
     const centre = c([t])
     const p = new THREE.Group()
+    p.name = 'wheel'
     p.position.copy(centre)
     wheelsRoot.add(p)
     p.updateMatrixWorld(true)
@@ -124,11 +126,16 @@ function rig(scene: THREE.Object3D) {
       m.metalness = 0.6
       m.roughness = 0.15
     } else if (n.includes('Rim_Silver')) {
+      // Chrome: fully metallic, near-mirror
+      m.color.set('#f4f5f6')
       m.metalness = 1
-      m.roughness = 0.22
+      m.roughness = 0.04
+      m.envMapIntensity = 1.5
     } else if (n.includes('Rim_Dark')) {
-      m.metalness = 0.9
-      m.roughness = 0.4
+      m.color.set('#9a9da1')
+      m.metalness = 1
+      m.roughness = 0.1
+      m.envMapIntensity = 1.3
     } else if (n.includes('Mirror')) {
       m.metalness = 1
       m.roughness = 0.03
@@ -149,8 +156,8 @@ function rig(scene: THREE.Object3D) {
   return { car, wheelsRoot, pivots, wheels, lamps }
 }
 
-function partOf(o: THREE.Object3D | null): Part | null {
-  for (; o; o = o.parent) if (o.name in KEYS) return o.name as Part
+function zoneOf(o: THREE.Object3D | null): Zone | null {
+  for (; o; o = o.parent) if (o.name in zones) return o.name as Zone
   return null
 }
 
@@ -184,10 +191,10 @@ export function Car() {
 
   const onMove = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation()
-    const part = partOf(e.object)
-    const hint = part ? `Click to open or close the ${partLabel[part]}` : null
+    const zone = zoneOf(e.object)
+    const hint = zone ? `${zones[zone].name[0].toUpperCase()}${zones[zone].name.slice(1)} — click for ${tabs.find((t) => t.id === zones[zone].tab)!.label}` : null
     if (useStore.getState().hint !== hint) useStore.getState().set({ hint })
-    document.body.style.cursor = part ? 'pointer' : 'grab'
+    document.body.style.cursor = zone ? 'pointer' : 'grab'
   }
   const onOut = () => {
     useStore.getState().set({ hint: null })
@@ -196,10 +203,11 @@ export function Car() {
   // A click only counts if the pointer did not travel: dragging turns the car instead.
   const onDown = (e: ThreeEvent<PointerEvent>) => (down.current = [e.clientX, e.clientY])
   const onClick = (e: ThreeEvent<MouseEvent>) => {
-    const part = partOf(e.object)
-    if (!part || Math.hypot(e.clientX - down.current[0], e.clientY - down.current[1]) > 6) return
+    const zone = zoneOf(e.object)
+    if (!zone || Math.hypot(e.clientX - down.current[0], e.clientY - down.current[1]) > 6) return
     e.stopPropagation()
-    useStore.getState().toggle(part)
+    if (zone === 'wheel') useStore.getState().set({ tab: zones.wheel.tab })
+    else useStore.getState().toggle(zone)
   }
 
   return (
