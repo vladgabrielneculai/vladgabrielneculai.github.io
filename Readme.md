@@ -1,4 +1,20 @@
 # My Portfolio
 
-This website is designed to be my online Portfolio. It describes some information about myself, my activities during the years, my projects and you can fill in the contact form so that we have the opportunity to collaborate.
-It is designed with HTML, CSS and some JavaScript.
+Live at <https://vladgabrielneculai.github.io/>.
+
+A single-screen portfolio built around an interactive 3D model of my Mazda3.
+
+- `garage/` — source code (React, TypeScript, Vite, Three.js). See `garage/README.md`.
+- `index.html`, `assets/`, `models/`, `favicon.png` — the **built** site that GitHub Pages serves. Generated; do not edit by hand.
+- `legacy/` — the previous HTML/CSS site, still reachable at `/legacy/`.
+
+## Update the live site
+
+```bash
+cd garage
+npm install
+npm run dev            # edit content at http://localhost:5173/?edit
+npm run publish-site   # build and copy the result to the repository root
+```
+
+Then commit and push to `main`.
