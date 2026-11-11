@@ -2,14 +2,17 @@ import { create } from 'zustand'
 import type { Tab } from './data'
 
 export type Part = 'hood' | 'trunk' | 'doorFL' | 'doorFR' | 'doorBL' | 'doorBR'
+export type Zone = Part | 'wheel'
 
-export const partLabel: Record<Part, string> = {
-  hood: 'bonnet',
-  trunk: 'boot',
-  doorFL: 'front door',
-  doorFR: 'front door',
-  doorBL: 'rear door',
-  doorBR: 'rear door',
+// Each clickable area of the car, what to call it, and the tab it leads to.
+export const zones: Record<Zone, { name: string; tab: Tab }> = {
+  hood: { name: 'bonnet', tab: 'skills' },
+  wheel: { name: 'wheels', tab: 'projects' },
+  doorFL: { name: 'door', tab: 'about' },
+  doorFR: { name: 'door', tab: 'about' },
+  doorBL: { name: 'door', tab: 'about' },
+  doorBR: { name: 'door', tab: 'about' },
+  trunk: { name: 'boot', tab: 'experience' },
 }
 
 type State = {
@@ -35,5 +38,6 @@ export const useStore = create<State>((set) => ({
   adjust: false,
   hint: null,
   set: (p) => set(p),
-  toggle: (part) => set((s) => ({ open: { ...s.open, [part]: !s.open[part] } })),
+  // Clicking a panel opens it and jumps to its tab; clicking again closes it.
+  toggle: (part) => set((s) => (s.open[part] ? { open: { ...s.open, [part]: false } } : { open: { ...s.open, [part]: true }, tab: zones[part].tab })),
 }))

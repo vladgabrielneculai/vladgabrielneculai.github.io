@@ -17,11 +17,16 @@ npm install
 npm run dev
 ```
 
+## Edit the content
+
+With `npm run dev` running, open <http://localhost:5173/?edit>. The form edits your profile, experience, projects and skills, and **Save** writes `src/content.json`. Commit and push to publish. The editor exists only in development; it is not in the built site. You can also edit `src/content.json` by hand.
+
 `npm run build` type-checks and writes a static site to `dist/` (relative paths, so it can be served from any folder).
 
 ## Where things live
 
-- `src/data.ts` — all text content (profile, experience, projects, skills).
+- `src/content.json` — all text content (profile, experience, projects, skills).
+- `src/store.ts` — `zones`: which part of the car leads to which tab.
 - `src/scene/Car.tsx` — loads the model, finds hinges and wheels from part bounds, applies materials.
 - `src/scene/Scene.tsx` — studio lighting, camera views per tab, ground shadow.
 - `src/ui/` — headline, tabs, content panel, adjust popover.
