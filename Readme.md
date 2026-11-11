@@ -5,6 +5,7 @@ Live at <https://vladgabrielneculai.github.io/>.
 A single-screen portfolio built around an interactive 3D model of my Mazda3.
 
 - `garage/` — source code (React, TypeScript, Vite, Three.js). See `garage/README.md`.
+- `content.json` — the site's text. Edit it at <https://vladgabrielneculai.github.io/?edit> (needs a GitHub token, see `garage/README.md`).
 - `index.html`, `assets/`, `models/`, `favicon.png` — the **built** site that GitHub Pages serves. Generated; do not edit by hand.
 - `legacy/` — the previous HTML/CSS site, still reachable at `/legacy/`.
 
