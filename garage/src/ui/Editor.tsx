@@ -4,7 +4,7 @@
 //    token with write access to the repository, which is what makes someone an admin: the
 //    page itself is public, but nothing can be saved without one.
 import { useState } from 'react'
-import { content, type Content } from '../data'
+import { content, templates, type Content } from '../data'
 
 const REPO = 'vladgabrielneculai/vladgabrielneculai.github.io'
 const BRANCH = 'main'
@@ -50,15 +50,6 @@ type Json = string | number | Json[] | { [k: string]: Json }
 const LONG = new Set(['tagline', 'blurb', 'about', 'notes'])
 const title = (k: string) => k[0].toUpperCase() + k.slice(1)
 
-// An empty copy of a value, used when adding a list item.
-function blank(v: Json, key = ''): Json {
-  if (key === 'kind') return 'work'
-  if (typeof v === 'string') return ''
-  if (typeof v === 'number') return 0
-  if (Array.isArray(v)) return []
-  return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, blank(x, k)]))
-}
-
 function Field({ name, value, onChange, parent = '' }: { name: string; value: Json; onChange: (v: Json) => void; parent?: string }) {
   if (Array.isArray(value)) {
     const move = (i: number, d: number) => {
@@ -87,7 +78,7 @@ function Field({ name, value, onChange, parent = '' }: { name: string; value: Js
             </div>
           </div>
         ))}
-        <button className="btn btn-quiet !py-1.5 !text-xs" onClick={() => onChange([...value, value.length ? blank(value[0]) : ''])}>
+        <button className="btn btn-quiet !py-1.5 !text-xs" onClick={() => onChange([...value, structuredClone(templates[name] ?? '') as Json])}>
           + Add
         </button>
       </fieldset>
