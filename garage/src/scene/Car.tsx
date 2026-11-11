@@ -170,6 +170,28 @@ function lampPoints(meshes: THREE.Mesh[], dir: 1 | -1) {
   })
 }
 
+// Gives the triangles of a mesh that `pick` accepts material `a` and the rest material `b`.
+function splitMaterial(m: THREE.Mesh, a: THREE.Material, b: THREE.Material, pick: (centre: THREE.Vector3) => boolean) {
+  const g = m.geometry
+  const pos = g.getAttribute('position')
+  const index = g.index
+  if (!index) return void (m.material = b)
+  const first: number[] = []
+  const rest: number[] = []
+  const v = new THREE.Vector3()
+  const c = new THREE.Vector3()
+  for (let i = 0; i < index.count; i += 3) {
+    c.set(0, 0, 0)
+    for (let k = 0; k < 3; k++) c.add(v.fromBufferAttribute(pos, index.getX(i + k)).applyMatrix4(m.matrixWorld))
+    ;(pick(c.divideScalar(3)) ? first : rest).push(index.getX(i), index.getX(i + 1), index.getX(i + 2))
+  }
+  g.setIndex([...first, ...rest])
+  g.clearGroups()
+  g.addGroup(0, first.length, 0)
+  g.addGroup(first.length, rest.length, 1)
+  m.material = [a, b]
+}
+
 function rig(scene: THREE.Object3D) {
   const car = new THREE.Group()
   car.add(scene)
@@ -229,6 +251,10 @@ function rig(scene: THREE.Object3D) {
     depthWrite: false,
     envMapIntensity: 1.8,
   })
+  // Rear lamp centres, unlit: amber indicators on the outer pair, clear reversing lamps on
+  // the inner pair.
+  const amberLens = new THREE.MeshPhysicalMaterial({ name: 'AmberLens', color: '#f2a007', roughness: 0.08, clearcoat: 1, transparent: true, opacity: 0.78, depthWrite: false, envMapIntensity: 1.4 })
+  const clearLens = new THREE.MeshPhysicalMaterial({ name: 'ClearLens', color: '#ffffff', roughness: 0.05, clearcoat: 1, transparent: true, opacity: 0.3, depthWrite: false, envMapIntensity: 1.6 })
   const frit = new THREE.MeshStandardMaterial({ name: 'Frit', color: '#050506', roughness: 0.15, metalness: 0.3 })
   const redLens = new THREE.MeshPhysicalMaterial({
     name: 'RedLens',
@@ -255,7 +281,13 @@ function rig(scene: THREE.Object3D) {
     else if (n.includes('Glass_Out_068')) m.material = redLens
     // The same "black glass" is the clear cover of the lamps and emblem, and the black
     // band printed round the windows.
-    else if (n.includes('Glass_Out_074')) m.material = /SM_Light_F|SM_Bumper_F|SideMirror/.test(m.name) ? lens : frit
+    else if (n.includes('Glass_Out_074')) {
+      if (/SM_Light_F|SM_Bumper_F|SideMirror/.test(m.name)) m.material = lens
+      else if (m.name.includes('SM_Light_B')) m.material = amberLens
+      // On the tailgate the same material is also the black band round the rear window.
+      else if (m.name.includes('SK_Trunk')) splitMaterial(m, clearLens, frit, (p) => p.y < 1.03 && Math.abs(p.x) > 0.15)
+      else m.material = frit
+    }
     else if (n.includes('Rim_Silver')) m.material = alloy
     else if (n.includes('Rim_Dark')) m.material = chromeDark
     else if (n.includes('Brake')) {
@@ -292,7 +324,7 @@ function rig(scene: THREE.Object3D) {
     }
   }
 
-  // --- Lamps: glow, beams and tail light spill, placed from the lamp geometry itself.
+  // --- Lamps: headlamp glow and beams, placed from the lamp geometry itself.
   const glow = glowTexture()
   const lampMeshes = (k: string) => meshes.filter((m) => m.name.includes(k) && matName(m).includes('Light'))
   const flare = (p: THREE.Vector3, color: THREE.ColorRepresentation, scale: number) => {
@@ -304,7 +336,6 @@ function rig(scene: THREE.Object3D) {
   }
   const flares: THREE.SpriteMaterial[] = []
   const beams: THREE.SpotLight[] = []
-  const spill: THREE.PointLight[] = []
   for (const p of lampPoints(lampMeshes('SM_Light_F'), 1)) {
     flares.push(flare(p, new THREE.Color(2.4, 2.5, 2.8), 0.5))
     const beam = new THREE.SpotLight('#dfe8ff', 0, 16, 0.55, 1, 1.6)
@@ -313,13 +344,7 @@ function rig(scene: THREE.Object3D) {
     car.add(beam, beam.target)
     beams.push(beam)
   }
-  for (const p of lampPoints([...lampMeshes('SM_Light_B'), ...lampMeshes('SK_Trunk')], -1)) {
-    // No flare at the rear: the lit rings themselves are the tail lamps.
-    const l = new THREE.PointLight('#ff2010', 0, 2.6, 2)
-    l.position.set(p.x, p.y, p.z - 0.25)
-    car.add(l)
-    spill.push(l)
-  }
+  // Nothing is added at the rear: the lit red rings themselves are the tail lamps.
 
   // --- Hinged panels
   const pivots = {} as Record<Part, THREE.Group>
@@ -371,7 +396,7 @@ function rig(scene: THREE.Object3D) {
   const tyreRadius = boxOf([tyres[0]]).getSize(new THREE.Vector3()).y / 2
   const tyreWidth = boxOf([tyres[0]]).getSize(new THREE.Vector3()).x
 
-  return { car, wheelsRoot, pivots, wheels, lampMat: lampMat as Mat | null, flares, beams, spill, spare, tyreRadius, tyreWidth }
+  return { car, wheelsRoot, pivots, wheels, lampMat: lampMat as Mat | null, flares, beams, spare, tyreRadius, tyreWidth }
 }
 
 function zoneOf(o: THREE.Object3D | null): Zone | null {
@@ -421,7 +446,6 @@ export function Car() {
     if (r.lampMat) r.lampMat.emissiveIntensity = a.lights * 3.4
     for (const f of r.flares) f.opacity = a.lights
     for (const b of r.beams) b.intensity = a.lights * 42
-    for (const l of r.spill) l.intensity = a.lights * 0.3
   })
 
   const onMove = (e: ThreeEvent<PointerEvent>) => {
