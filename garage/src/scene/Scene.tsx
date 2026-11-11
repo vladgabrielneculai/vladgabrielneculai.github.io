@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { easing } from 'maath'
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
+import type { OrbitControls as Controls } from 'three-stdlib'
 import type { Tab } from '../data'
 import { INTRO_END, intro, useStore } from '../store'
 import { Car } from './Car'
@@ -52,17 +53,27 @@ function GroundShadow() {
   )
 }
 
+// Driver's seat (left-hand drive): where the camera sits for "About me", what it looks at,
+// and the point outside the open door it passes through on the way in.
+const HEAD = new THREE.Vector3(0.37, 1.15, -0.3)
+const AHEAD = new THREE.Vector3(0.3, 0.97, 1.4)
+const DOORWAY = new THREE.Vector3(2.4, 1.3, -0.55)
+const REACH = 0.15
+
 function Rig() {
   const { camera, size } = useThree()
   const cam = camera as THREE.PerspectiveCamera
   const tab = useStore((s) => s.tab)
   const ready = useStore((s) => s.ready)
-  const controls = useRef(null)
+  const controls = useRef<Controls>(null)
   const moving = useRef(true)
+  const stage = useRef(0) // getting in: 0 = walk to the door, 1 = sit down
   const off = useRef({ x: 0, y: 0 })
   const sph = useMemo(() => new THREE.Spherical(), [])
   const rel = useMemo(() => new THREE.Vector3(), [])
+  const look = useMemo(() => TARGET.clone(), [])
   const portrait = size.width / size.height < 0.9
+  const inside = tab === 'about'
   // ?cam=x,y,z,tx,ty,tz pins the camera (used for close-up captures).
   const pinned = useMemo(() => new URLSearchParams(location.search).get('cam')?.split(',').map(Number), [])
   // ?intro=1.8 holds the opening sequence at that second.
@@ -71,9 +82,34 @@ function Rig() {
     return v === null ? null : Number(v)
   }, [])
 
+  const setDoor = (open: boolean) => {
+    const s = useStore.getState()
+    if (s.open.doorFL !== open) s.set({ open: { ...s.open, doorFL: open } })
+  }
+
+  // While the camera travels, the orbit limits are lifted so they cannot pull it back.
   useEffect(() => {
+    const c = controls.current
+    if (c) {
+      c.enabled = false
+      c.minDistance = 0.01
+      c.maxDistance = 60
+      c.minPolarAngle = 0.02
+      c.maxPolarAngle = Math.PI - 0.02
+      if (!inside) c.target.copy(TARGET)
+    }
     moving.current = true
-  }, [tab, portrait])
+    stage.current = 0
+    if (inside) {
+      look.copy(TARGET)
+      setDoor(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab])
+  useEffect(() => {
+    if (!inside) moving.current = true
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [portrait])
 
   useFrame((_, dt) => {
     // Opening sequence: the clock starts once the car has loaded.
@@ -97,10 +133,36 @@ function Rig() {
     const playing = intro.t < INTRO_END
     easing.damp(off.current, 'x', portrait || playing ? 0 : size.width * (panel ? 0.17 : -0.19), playing ? 0.01 : 0.3, dt)
     easing.damp(off.current, 'y', portrait ? size.height * (panel ? 0.24 : 0.08) : 0, 0.3, dt)
-    cam.fov = portrait ? 50 : 30
+    cam.fov = portrait ? 50 : inside ? 42 : 30
     cam.setViewOffset(size.width, size.height, off.current.x, off.current.y, size.width, size.height)
 
     if (!moving.current) return
+    const c = controls.current
+
+    if (inside) {
+      // Through the open driver's door and into the seat.
+      const goal = stage.current === 0 ? DOORWAY : HEAD
+      easing.damp3(cam.position, goal, 0.4, dt)
+      easing.damp3(look, stage.current === 0 ? HEAD : AHEAD, 0.4, dt)
+      cam.lookAt(look)
+      const d = cam.position.distanceTo(goal)
+      if (stage.current === 0 && d < 0.4) stage.current = 1
+      else if (stage.current === 1 && d < 0.012) {
+        moving.current = false
+        setDoor(false)
+        if (c) {
+          // Seated: dragging now turns the head instead of orbiting the car.
+          c.target.copy(HEAD).addScaledVector(rel.copy(AHEAD).sub(HEAD).normalize(), REACH)
+          c.minDistance = c.maxDistance = REACH
+          c.minPolarAngle = 0.95
+          c.maxPolarAngle = 2.05
+          c.enabled = true
+          c.update()
+        }
+      }
+      return
+    }
+
     const v = VIEWS[tab]
     const goal = { theta: (v.az * Math.PI) / 180, phi: ((90 - v.el) * Math.PI) / 180, radius: v.r * (portrait ? 1.3 : 1) }
     sph.setFromVector3(rel.copy(cam.position).sub(TARGET))
@@ -113,25 +175,19 @@ function Rig() {
     easing.damp(sph, 'radius', goal.radius, smooth, dt)
     cam.position.setFromSpherical(sph).add(TARGET)
     cam.lookAt(TARGET)
-    if (!playing && Math.abs(sph.theta - goal.theta) + Math.abs(sph.phi - goal.phi) + Math.abs(sph.radius - goal.radius) < 0.002) moving.current = false
+    if (!playing && Math.abs(sph.theta - goal.theta) + Math.abs(sph.phi - goal.phi) + Math.abs(sph.radius - goal.radius) < 0.002) {
+      moving.current = false
+      if (c) {
+        c.minDistance = 4.5
+        c.maxDistance = 11.2
+        c.minPolarAngle = 0.5
+        c.maxPolarAngle = Math.PI / 2 - 0.03
+        c.enabled = true
+      }
+    }
   })
 
-  return (
-    <OrbitControls
-      ref={controls}
-      enabled={!pinned}
-      target={TARGET}
-      enablePan={false}
-      enableDamping
-      dampingFactor={0.08}
-      rotateSpeed={0.6}
-      minDistance={4.5}
-      maxDistance={11.2}
-      minPolarAngle={0.5}
-      maxPolarAngle={Math.PI / 2 - 0.03}
-      onStart={() => (moving.current = false)}
-    />
-  )
+  return <OrbitControls ref={controls as never} enabled={false} target={TARGET} enablePan={false} enableDamping dampingFactor={0.08} rotateSpeed={0.6} />
 }
 
 export function Scene() {
@@ -139,7 +195,7 @@ export function Scene() {
   const pinned = Number(new URLSearchParams(location.search).get('dpr')) || 0
   const [dpr, setDpr] = useState(pinned || Math.min(1.75, window.devicePixelRatio))
   return (
-    <Canvas dpr={dpr} gl={{ antialias: true, powerPreference: 'high-performance', toneMappingExposure: 0.82 }} camera={{ fov: 30, near: 0.1, far: 80, position: [0.6, 0.5, 11.2] }}>
+    <Canvas dpr={dpr} gl={{ antialias: true, powerPreference: 'high-performance', toneMappingExposure: 0.82 }} camera={{ fov: 30, near: 0.04, far: 80, position: [0.6, 0.5, 11.2] }}>
       {!pinned && <PerformanceMonitor onDecline={() => setDpr((d) => Math.max(0.9, d - 0.25))} onIncline={() => setDpr((d) => Math.min(1.75, d + 0.25))} />}
       <Suspense fallback={null}>
         <Garage />

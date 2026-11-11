@@ -4,7 +4,7 @@ Single-screen portfolio built around a real-time 3D model of my Mazda3 (Machine 
 
 - Drag to turn the car.
 - Click the bonnet, a door, a wheel or the boot to open Skills, About me, Projects or Experience.
-- Tabs turn the car and open a content panel.
+- Tabs turn the car and open a content panel. About me puts you in the driver's seat; drag to look around.
 - "Adjust the car": ride height, wheel camber, lights.
 
 ## Stack
@@ -20,7 +20,11 @@ npm run dev
 
 ## Edit the content
 
-With `npm run dev` running, open <http://localhost:5173/?edit>. The form edits your profile, experience, projects and skills, and **Save** writes `src/content.json`. Commit and push to publish. The editor exists only in development; it is not in the built site. You can also edit `src/content.json` by hand.
+All text is in `public/content.json`, fetched when the page opens. Two ways to edit it with the form at `/?edit`:
+
+**On the live site (admin).** Open <https://vladgabrielneculai.github.io/?edit>. It asks for a GitHub personal access token: create a *fine-grained* token (GitHub → Settings → Developer settings → Personal access tokens), repository access limited to this repository, permission *Contents: Read and write*. **Save** commits `content.json` to `main`; the live site follows in about a minute. The token is kept only in that browser (Sign out removes it) and is sent only to GitHub. Anyone can open the page, but nothing can be saved without a token that has write access.
+
+**Locally.** With `npm run dev` running, open <http://localhost:5173/?edit>. No token needed; **Save** writes `public/content.json`. Then publish as below.
 
 ## Publish
 
@@ -28,10 +32,11 @@ With `npm run dev` running, open <http://localhost:5173/?edit>. The form edits y
 
 ## Where things live
 
-- `src/content.json` — all text content (profile, experience, projects, skills).
+- `public/content.json` — all text content (profile, experience, projects, skills).
 - `src/store.ts` — `zones`: which part of the car leads to which tab.
 - `src/scene/Car.tsx` — loads the model, finds hinges, wheels and lamps from part bounds, builds paint, glass, brake and lamp materials.
 - `src/scene/Garage.tsx` — the room, its lights and the timing of the opening sequence.
+- `src/scene/Props.tsx` — garage furniture (tool chest, workbench, racks, drums).
 - `src/scene/Scene.tsx` — camera views per tab, opening-sequence clock, ground shadow.
 - `src/ui/` — headline, tabs, content panel, adjust popover.
 - `public/models/mazda3.glb` — the car, converted from FBX and compressed (Meshopt + WebP, ~3.6 MB).

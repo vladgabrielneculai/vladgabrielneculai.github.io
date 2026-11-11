@@ -1,8 +1,49 @@
-// Local content editor. Only exists under `npm run dev` (open /?edit); it is not part of
-// the published site. Saving writes src/content.json through the dev server.
+// Content editor, opened at /?edit. Two ways to save:
+//  - under `npm run dev`, straight to public/content.json through the dev server;
+//  - on the live site, as a commit to the GitHub repository. That needs a personal access
+//    token with write access to the repository, which is what makes someone an admin: the
+//    page itself is public, but nothing can be saved without one.
 import { useState } from 'react'
-import content from '../content.json'
-import type { Content } from '../data'
+import { content, type Content } from '../data'
+
+const REPO = 'vladgabrielneculai/vladgabrielneculai.github.io'
+const BRANCH = 'main'
+// The live copy first, then the source copy, so a rebuild cannot bring old text back.
+const FILES = ['content.json', 'garage/public/content.json']
+const TOKEN_KEY = 'portfolio-admin-token'
+const API = `https://api.github.com/repos/${REPO}`
+
+const gh = (token: string, path: string, init?: RequestInit) =>
+  fetch(API + path, { ...init, headers: { authorization: `Bearer ${token}`, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28' } })
+
+function toBase64(text: string) {
+  let bin = ''
+  for (const byte of new TextEncoder().encode(text)) bin += String.fromCharCode(byte)
+  return btoa(bin)
+}
+
+// Resolves to null when the token can write to the repository, otherwise to the reason.
+async function checkToken(token: string) {
+  const res = await gh(token, '')
+  if (res.status === 401) return 'GitHub rejected this token.'
+  if (!res.ok) return `GitHub answered ${res.status}. The token may not cover this repository.`
+  const repo = await res.json()
+  return repo.permissions?.push ? null : 'This token can read the repository but not write to it.'
+}
+
+async function commit(token: string, data: Content) {
+  const body = JSON.stringify(data, null, 2) + '\n'
+  for (const file of FILES) {
+    const current = await gh(token, `/contents/${file}?ref=${BRANCH}`)
+    if (!current.ok) throw new Error(`could not read ${file} (${current.status})`)
+    const { sha } = await current.json()
+    const put = await gh(token, `/contents/${file}`, {
+      method: 'PUT',
+      body: JSON.stringify({ message: 'Update portfolio content', content: toBase64(body), sha, branch: BRANCH }),
+    })
+    if (!put.ok) throw new Error(`could not save ${file} (${put.status})`)
+  }
+}
 
 type Json = string | number | Json[] | { [k: string]: Json }
 
@@ -81,7 +122,60 @@ function Field({ name, value, onChange, parent = '' }: { name: string; value: Js
   )
 }
 
+function SignIn({ onToken }: { onToken: (t: string) => void }) {
+  const [value, setValue] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setBusy(true)
+    setError('')
+    try {
+      const problem = await checkToken(value.trim())
+      if (problem) setError(problem)
+      else onToken(value.trim())
+    } catch {
+      setError('Could not reach GitHub.')
+    }
+    setBusy(false)
+  }
+  return (
+    <div className="grid h-full place-items-center overflow-y-auto bg-paper p-5">
+      <form onSubmit={submit} className="w-full max-w-md rounded-2xl border border-line bg-white p-6 shadow-xl">
+        <h1 className="text-xl font-extrabold tracking-tight">Admin sign-in</h1>
+        <p className="mt-2 text-sm leading-relaxed text-ink/65">
+          Editing this site needs a GitHub personal access token that can write to <span className="font-semibold text-ink">{REPO}</span>. It is kept only in this browser and sent
+          only to GitHub.
+        </p>
+        <label className="ed-field mt-4">
+          <span>Access token</span>
+          <input type="password" autoComplete="off" value={value} onChange={(e) => setValue(e.target.value)} placeholder="github_pat_…" required />
+        </label>
+        {error && (
+          <p className="mt-2 text-sm text-accent" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="mt-5 flex items-center gap-3">
+          <button className="btn" disabled={busy}>
+            {busy ? 'Checking…' : 'Sign in'}
+          </button>
+          <a className="text-sm font-semibold text-ink/60 hover:text-ink" href="./">
+            Back to site
+          </a>
+        </div>
+        <p className="mt-5 border-t border-line pt-4 text-xs leading-relaxed text-ink/50">
+          Create one on GitHub: Settings → Developer settings → Personal access tokens → Fine-grained tokens. Repository access: only this repository. Permissions: Contents → Read and
+          write.
+        </p>
+      </form>
+    </div>
+  )
+}
+
 export default function Editor() {
+  const local = import.meta.env.DEV
+  const [token, setToken] = useState(() => (local ? '' : (localStorage.getItem(TOKEN_KEY) ?? '')))
   const [data, setData] = useState<Content>(content)
   const [status, setStatus] = useState('')
   const sections = Object.keys(data) as (keyof Content)[]
@@ -90,12 +184,31 @@ export default function Editor() {
   const save = async () => {
     setStatus('Saving…')
     try {
-      const res = await fetch('/__content', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) })
-      setStatus(res.ok ? 'Saved to src/content.json' : `Not saved: ${await res.text()}`)
+      if (local) {
+        const res = await fetch('/__content', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) })
+        setStatus(res.ok ? 'Saved to public/content.json' : `Not saved: ${await res.text()}`)
+      } else {
+        await commit(token, data)
+        setStatus('Saved. The live site updates in about a minute.')
+      }
     } catch (e) {
-      setStatus(`Not saved: ${String(e)}`)
+      setStatus(`Not saved: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
+  const signOut = () => {
+    localStorage.removeItem(TOKEN_KEY)
+    setToken('')
+  }
+
+  if (!local && !token)
+    return (
+      <SignIn
+        onToken={(t) => {
+          localStorage.setItem(TOKEN_KEY, t)
+          setToken(t)
+        }}
+      />
+    )
 
   return (
     <div className="h-full overflow-y-auto bg-paper">
@@ -104,6 +217,11 @@ export default function Editor() {
         <span className="text-sm text-ink/60" role="status">
           {status}
         </span>
+        {!local && (
+          <button className="text-sm font-semibold text-ink/60 hover:text-ink" onClick={signOut}>
+            Sign out
+          </button>
+        )}
         <a className="btn btn-quiet" href="./">
           View site
         </a>
@@ -120,7 +238,7 @@ export default function Editor() {
           ))}
         </nav>
         <Field name={section} value={data[section] as Json} onChange={(v) => setData({ ...data, [section]: v } as Content)} />
-        <p className="mt-6 text-xs text-ink/50">Skill level is 0–10. Leave a project's Href empty to hide its link. Changes go live on the site only after you commit and push.</p>
+        <p className="mt-6 text-xs text-ink/50">Skill level is 0–10. Leave a project's Href empty to hide its link. {local ? 'Saved changes go live after you run npm run publish-site, commit and push.' : 'Saving commits the change to GitHub; the live site follows in about a minute.'}</p>
       </div>
     </div>
   )
