@@ -4,10 +4,10 @@
     "role": "Software Developer Engineer",
     "tagline": "I write clean, reliable software — and spend my weekends around modified cars. This one is mine.",
     "location": "Bucharest, Romania",
-    "email": "vladneculaigabriel@gmail.com",
+    "email": "vg.neculai@gmail.com",
     "about": [
       "I am a developer who likes clean, efficient code that solves real problems — and I am always looking for the next technology to take apart and learn.",
-      "I do my best work in a team: sharing ideas, keeping everyone aligned, and shipping on time. Away from the keyboard you will find me at car meets or driving my Mazda3."
+      "I do my best work in a team: sharing ideas, keeping everyone aligned, and shipping on time. Away from the keyboard you will find me chatting with car enthusiasts or driving my Mazda3."
     ],
     "links": [
       {
@@ -25,7 +25,7 @@
     ],
     "specs": [
       {
-        "label": "Base",
+        "label": "Location",
         "value": "Bucharest, Romania"
       },
       {
@@ -33,11 +33,11 @@
         "value": "BSc Computer & Information Technology"
       },
       {
-        "label": "Now",
+        "label": "Master",
         "value": "MSc Management, Innovation & Technology of Collaborative Systems"
       },
       {
-        "label": "School",
+        "label": "University",
         "value": "Politehnica Bucharest · FILS (French section)"
       },
       {
@@ -57,23 +57,26 @@
       {
         "name": "French",
         "level": "Advanced"
-      },
-      {
-        "name": "German",
-        "level": "Basic"
       }
     ]
   },
   "experience": [
     {
-      "when": "2024 — now",
+      "when": "Oct 2024 — June 2026",
       "title": "MSc, Management, Innovation & Technology of Collaborative Systems",
       "org": "Politehnica Bucharest · FILS",
       "kind": "edu",
       "notes": []
     },
     {
-      "when": "02/2023 — now",
+      "when": "Oct 2020 — June 2024",
+      "title": "BSc, Computer & Information Technology",
+      "org": "Politehnica Bucharest · FILS",
+      "kind": "edu",
+      "notes": []
+    },
+    {
+      "when": "Feb 2023 — Sept 2024",
       "title": "Application Support Analyst",
       "org": "Groupe Société Générale Romania",
       "kind": "work",
@@ -84,7 +87,7 @@
       ]
     },
     {
-      "when": "05/2022 — now",
+      "when": "May 2022 — Dec 2025",
       "title": "Programming Analyst",
       "org": "Școala Gimnazială Grigore Tocilescu",
       "kind": "work",
@@ -93,8 +96,8 @@
       ]
     },
     {
-      "when": "09/2021 — 06/2022",
-      "title": "ICT Teacher",
+      "when": "Sept 2021 — June 2022",
+      "title": "Informatics Teacher",
       "org": "Școala Gimnazială Grigore Tocilescu",
       "kind": "work",
       "notes": [
@@ -102,60 +105,28 @@
       ]
     },
     {
-      "when": "2020 — 2024",
-      "title": "BSc, Computer & Information Technology",
-      "org": "Politehnica Bucharest · FILS",
-      "kind": "edu",
-      "notes": []
+      "when": "Sept 2024 - Now",
+      "title": "Software Development Engineer",
+      "org": "Cegedim Service Center",
+      "kind": "work",
+      "notes": [
+        "Comprehensive management of configuration, setup, and development of an employee management application, based on JavaScript language.",
+        "Thorough elaboration of technical and functional analyses to accurately address specific client needs.",
+        "Rigorous validation of solutions found to ensure their effectiveness and compliance with requirements.",
+        "Systematic testing of new configurations to assess their operation and integration into the existing system.",
+        "Meticulous preparation of necessary documentation to ensure a clear understanding and smooth usage of the application.",
+        "Continuous provision of assistance and support to the team to resolve issues and optimize work processes."
+      ]
     }
   ],
   "projects": [
-    {
-      "name": "RevvedUp",
-      "kind": "Android app · Bachelor thesis",
-      "year": "2024",
-      "blurb": "An app for the Romanian car-enthusiast scene. It recommends meets and events to owners using a recommendation algorithm I designed myself.",
-      "tags": [
-        "Android",
-        "Recommender",
-        "Car scene"
-      ],
-      "href": "https://github.com/vladgabrielneculai/RevvedUp"
-    },
-    {
-      "name": "TechnoHub",
-      "kind": "Web shop · University project",
-      "year": "2023",
-      "blurb": "A storefront with product selection, quantities, cart and order placement, backed by a PL/SQL database.",
-      "tags": [
-        "PHP",
-        "HTML/CSS",
-        "PL/SQL"
-      ],
-      "href": "https://github.com/vladgabrielneculai/technohub.github.io"
-    },
-    {
-      "name": "This portfolio",
-      "kind": "Personal site",
-      "year": "2026",
-      "blurb": "A real-time 3D model of my own car that you can turn, open and adjust in the browser.",
-      "tags": [
-        "React",
-        "Three.js",
-        "TypeScript"
-      ],
-      "href": ""
-    }
+    "Leuta",
+    ""
   ],
   "skills": [
     {
       "name": "Java",
-      "level": 10,
-      "group": "Languages"
-    },
-    {
-      "name": "Rust",
-      "level": 5,
+      "level": 8,
       "group": "Languages"
     },
     {
@@ -180,13 +151,28 @@
     },
     {
       "name": "CSS",
-      "level": 7.5,
+      "level": 8,
       "group": "Web"
     },
     {
       "name": "JavaScript",
-      "level": 3,
+      "level": 5,
       "group": "Web"
+    },
+    {
+      "name": "React",
+      "level": 6,
+      "group": "Languages"
+    },
+    {
+      "name": "Next.js",
+      "level": 5,
+      "group": "Languages"
+    },
+    {
+      "name": "Artificial Intelligence",
+      "level": 9,
+      "group": "Skill"
     }
   ]
 }
