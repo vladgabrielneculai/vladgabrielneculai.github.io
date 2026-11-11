@@ -25,8 +25,7 @@ body {
   overflow: hidden;
   font-family: var(--font-sans);
   color: var(--color-ink);
-  /* Studio backdrop: a pool of light on the floor under the car, falling off to the walls. */
-  background: radial-gradient(ellipse 75% 60% at 50% 66%, #fdfdfe 0%, #eceef0 45%, #d3d6da 100%);
+  background: #070809;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -78,6 +77,23 @@ button {
 .btn-quiet:hover {
   color: #fff;
   background: var(--color-ink);
+}
+
+.ui {
+  transition: opacity 0.9s ease;
+}
+.ui-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  background: linear-gradient(0deg, rgb(4 5 6 / 0.82) 0%, rgb(4 5 6 / 0.35) 34%, transparent 58%);
+  pointer-events: none;
+  transition: opacity 0.4s;
 }
 
 .intro {
@@ -187,10 +203,13 @@ button {
 }
 
 @media (min-width: 768px) {
+  .scrim {
+    background: linear-gradient(90deg, rgb(4 5 6 / 0.78) 0%, rgb(4 5 6 / 0.4) 30%, transparent 55%);
+  }
   .intro {
     left: 2rem;
     right: auto;
-    bottom: 6.5rem;
+    bottom: 9rem;
   }
   .hint {
     top: 1.5rem;
