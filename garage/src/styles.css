@@ -189,26 +189,30 @@ button {
 .panel-tall {
   height: calc(100svh - 8.5rem - env(safe-area-inset-bottom));
 }
-.panel-grip {
+/* Swiped down: only the header shows, and the car has the screen. */
+.panel-peek {
+  height: 5.1rem;
+  overflow: hidden;
+}
+.panel-head {
   position: sticky;
   z-index: 1;
   top: 0;
-  display: block;
-  width: 100%;
-  height: 1.4rem;
+  padding: 0 1.25rem 0.6rem;
   background: rgb(255 255 255 / 0.96);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
 }
-.panel-grip::after {
-  content: '';
-  display: block;
+.panel-grip {
   width: 2.5rem;
   height: 4px;
-  margin: 0 auto;
+  margin: 0.55rem auto 0.6rem;
   background: rgb(20 22 26 / 0.2);
   border-radius: 4px;
 }
 .panel-body {
-  padding: 0.25rem 1.25rem 1.5rem;
+  padding: 0.5rem 1.25rem 1.5rem;
   animation: rise 0.35s ease both;
 }
 @keyframes rise {
@@ -264,7 +268,9 @@ button {
     background: var(--color-accent);
   }
   .panel,
-  .panel-tall {
+  .panel-tall,
+  .panel-peek {
+    overflow-y: auto;
     inset: 5.5rem 2rem 6rem auto;
     width: min(27rem, 36vw);
     height: auto;
@@ -279,8 +285,13 @@ button {
   .panel-grip {
     display: none;
   }
+  .panel-head {
+    padding: 1.75rem 1.75rem 0.75rem;
+    cursor: default;
+    touch-action: auto;
+  }
   .panel-body {
-    padding: 1.75rem;
+    padding: 0.5rem 1.75rem 1.75rem;
   }
 }
 @media (min-width: 1280px) {
