@@ -23,7 +23,7 @@ function About() {
       <button className="btn btn-quiet mt-4 !py-2 !text-xs" onClick={() => set({ tab: 'home' })}>
         Leave the car
       </button>
-      <p className="mt-2 text-xs text-ink/45">You are in the driver's seat. Drag to look around; clicking the driver's door also gets you out.</p>
+      <p className="mt-2 text-xs text-ink/45">You are in the driver's seat. Drag to look around. To get out the way you would in a real car: tap the driver's door to open it, then tap the garage outside.</p>
       <ul className="mt-4 flex flex-wrap gap-2 text-xs">
         {profile.languages.map((l) => (
           <li key={l.name} className="rounded-full border border-line px-3 py-1.5 text-ink/60">
