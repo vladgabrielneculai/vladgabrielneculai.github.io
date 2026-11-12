@@ -496,12 +496,17 @@ export function Car() {
   const onDown = (e: ThreeEvent<PointerEvent>) => (down.current = [e.clientX, e.clientY])
   const onClick = (e: ThreeEvent<MouseEvent>) => {
     const zone = zoneOf(e.object)
-    if (!zone || Math.hypot(e.clientX - down.current[0], e.clientY - down.current[1]) > 6) return
-    e.stopPropagation()
+    if (Math.hypot(e.clientX - down.current[0], e.clientY - down.current[1]) > 6) return
     const st = useStore.getState()
+    // Seated with the driver's door open: a tap out through the doorway gets you out, even
+    // where it lands on the sill or the seat edge rather than on the garage beyond.
+    if (st.tab === 'about' && st.open.doorFL && zone !== 'doorFL' && e.ray.direction.x > 0.45) {
+      e.stopPropagation()
+      return st.set({ tab: 'home' })
+    }
+    if (!zone) return
+    e.stopPropagation()
     if (zone === 'wheel') st.set({ tab: zones.wheel.tab })
-    // From the driver's seat, the driver's door is the way out.
-    else if (zone === 'doorFL' && st.tab === 'about') st.set({ tab: 'home' })
     else st.toggle(zone)
   }
 
