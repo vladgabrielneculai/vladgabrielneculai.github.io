@@ -2,6 +2,16 @@ import { useProgress } from '@react-three/drei'
 import { profile, tabs } from '../data'
 import { useStore } from '../store'
 
+// Tab icons for the phone navigation bar (24 px line icons).
+const ICONS: Record<string, string> = {
+  home: 'M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4v-6h-6v6H5a1 1 0 0 1-1-1z',
+  about: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4.5 20a7.5 7.5 0 0 1 15 0',
+  experience: 'M4 8h16v11H4zM9 8V5.5h6V8M4 13h16',
+  projects: 'M4 5h7v7H4zM13 5h7v7h-7zM4 14h7v5H4zM13 14h7v5h-7z',
+  skills: 'M12 14l4-5M5 18a8 8 0 1 1 14 0z',
+  contact: 'M4 6h16v12H4zM4 7l8 6 8-6',
+}
+
 export function Loader() {
   const ready = useStore((s) => s.ready)
   const { progress } = useProgress()
@@ -23,13 +33,14 @@ export function Loader() {
 function Adjust() {
   const s = useStore()
   return (
-    <div className="pointer-events-none fixed bottom-[4.6rem] left-3 z-30 md:left-8 xl:bottom-6">
+    <div className="adjust">
+      <button className="btn btn-quiet pointer-events-auto shadow-sm" onClick={() => s.set({ adjust: !s.adjust })} aria-expanded={s.adjust}>
+        {s.adjust ? 'Done' : 'Adjust the car'}
+      </button>
       <div
         aria-hidden={!s.adjust}
         inert={!s.adjust}
-        className={`mb-2 w-64 rounded-2xl border border-line bg-white/90 p-4 text-sm shadow-xl backdrop-blur transition-all duration-200 ${
-          s.adjust ? 'pointer-events-auto opacity-100' : 'translate-y-2 opacity-0'
-        }`}
+        className={`w-64 rounded-2xl border border-line bg-white/90 p-4 text-sm shadow-xl backdrop-blur transition-opacity duration-200 ${s.adjust ? 'pointer-events-auto opacity-100' : 'opacity-0'}`}
       >
         <label className="mb-3 block">
           <span className="mb-1.5 flex justify-between">
@@ -52,26 +63,22 @@ function Adjust() {
           </span>
         </button>
       </div>
-      <button className="btn btn-quiet pointer-events-auto shadow-sm" onClick={() => s.set({ adjust: !s.adjust })} aria-expanded={s.adjust}>
-        {s.adjust ? 'Done' : 'Adjust the car'}
-      </button>
     </div>
   )
 }
 
 export function Chrome({ webgl }: { webgl: boolean }) {
   const tab = useStore((s) => s.tab)
-  const hint = useStore((s) => s.hint)
   const set = useStore((s) => s.set)
   const home = tab === 'home'
 
   return (
     <>
       <header className="pointer-events-none fixed inset-x-0 top-0 z-30 flex items-start justify-between p-4 md:px-8 md:py-6">
-        <div className={`transition-opacity duration-300 ${home ? 'opacity-0' : ''}`}>
-          <p className="font-extrabold tracking-tight text-white">{profile.name}</p>
-          <p className="text-xs text-white/60">{profile.role}</p>
-        </div>
+        <button className={`pointer-events-auto text-left transition-opacity duration-300 ${home ? 'pointer-events-none opacity-0' : ''}`} onClick={() => set({ tab: 'home' })} aria-label="Back to the start">
+          <span className="block font-extrabold tracking-tight text-white">{profile.name}</span>
+          <span className="block text-xs text-white/60">{profile.role}</span>
+        </button>
         <nav className="pointer-events-auto hidden gap-5 text-sm font-semibold md:flex" aria-label="Profiles">
           {profile.links.slice(0, 2).map((l) => (
             <a key={l.label} href={l.href} target="_blank" rel="noreferrer" className="text-white/70 hover:text-white">
@@ -96,13 +103,12 @@ export function Chrome({ webgl }: { webgl: boolean }) {
         </button>
       </div>
 
-      <div role="status" className={`hint ${hint || ((home || tab === 'about') && webgl) ? 'opacity-100' : 'opacity-0'}`}>
-        {hint ?? (tab === 'about' ? 'You are in the driver’s seat · drag to look around' : 'Drag to turn the car · click the bonnet, a door, a wheel or the boot')}
-      </div>
-
       <nav className="tabs" aria-label="Sections">
         {tabs.map((t) => (
-          <button key={t.id} onClick={() => set({ tab: t.id })} aria-current={t.id === tab} className={t.id === tab ? 'tab tab-on' : 'tab'}>
+          <button key={t.id} onClick={() => set({ tab: t.id })} aria-current={t.id === tab} className={`tab tab-${t.id} ${t.id === tab ? 'tab-on' : ''}`}>
+            <svg className="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d={ICONS[t.id]} />
+            </svg>
             {t.label}
           </button>
         ))}

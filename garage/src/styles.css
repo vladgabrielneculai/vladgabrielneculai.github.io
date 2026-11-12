@@ -101,98 +101,114 @@ button {
   z-index: 20;
   left: 1rem;
   right: 1rem;
-  bottom: 9.4rem;
+  bottom: calc(5.4rem + env(safe-area-inset-bottom));
   transition:
     opacity 0.35s,
     transform 0.35s;
 }
 
-.hint {
+/* "Adjust the car": top right on phones, bottom left on desktop. */
+.adjust {
   position: fixed;
-  z-index: 20;
-  top: 1rem;
-  left: 50%;
-  translate: -50% 0;
-  max-width: calc(100vw - 2rem);
-  padding: 0.45rem 0.9rem;
-  font-size: 12px;
-  color: rgb(20 22 26 / 0.7);
-  text-align: center;
-  background: rgb(255 255 255 / 0.8);
-  border: 1px solid var(--color-line);
-  border-radius: 999px;
-  backdrop-filter: blur(8px);
+  z-index: 35;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
   pointer-events: none;
-  transition: opacity 0.25s;
 }
 
+/* Section navigation. Phones: a full-width bar of five icons (Home is the name at the top
+   left, or closing the sheet). Desktop: a floating pill of text tabs. */
 .tabs {
   position: fixed;
   z-index: 40;
-  left: 50%;
-  bottom: 0.75rem;
-  translate: -50% 0;
-  display: flex;
-  gap: 0.15rem;
-  max-width: calc(100vw - 1rem);
-  padding: 0.3rem;
-  overflow-x: auto;
-  background: rgb(255 255 255 / 0.88);
-  border: 1px solid var(--color-line);
-  border-radius: 999px;
-  box-shadow: 0 10px 30px rgb(20 22 26 / 0.1);
-  backdrop-filter: blur(12px);
-  scrollbar-width: none;
+  inset: auto 0 0 0;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  padding: 0.35rem 0.25rem calc(0.35rem + env(safe-area-inset-bottom));
+  background: rgb(255 255 255 / 0.94);
+  border-top: 1px solid var(--color-line);
+  backdrop-filter: blur(14px);
 }
 .tab {
-  padding: 0.55rem 0.85rem;
-  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.3rem 0;
+  font-size: 10.5px;
   font-weight: 700;
   white-space: nowrap;
-  color: rgb(20 22 26 / 0.6);
-  border-radius: 999px;
+  color: rgb(20 22 26 / 0.55);
+  border-radius: 0.75rem;
   transition:
     background 0.2s,
     color 0.2s;
 }
-.tab:hover {
-  color: var(--color-ink);
+.tab-icon {
+  width: 22px;
+  height: 22px;
 }
-.tab-on,
-.tab-on:hover {
-  color: #fff;
-  background: var(--color-accent);
+.tab-home {
+  display: none;
+}
+.tab-on {
+  color: var(--color-accent);
 }
 
 /* Content panel: bottom sheet on phones, side card on desktop. */
 .panel {
   position: fixed;
   z-index: 30;
-  left: 0.5rem;
-  right: 0.5rem;
-  bottom: 4.2rem;
-  height: 52svh;
+  inset: auto 0 calc(3.75rem + env(safe-area-inset-bottom)) 0;
+  height: 50svh;
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: rgb(255 255 255 / 0.94);
+  background: rgb(255 255 255 / 0.96);
   border: 1px solid var(--color-line);
-  border-radius: 1.25rem;
-  box-shadow: 0 24px 60px rgb(20 22 26 / 0.16);
+  border-bottom: 0;
+  border-radius: 1.25rem 1.25rem 0 0;
+  box-shadow: 0 -12px 40px rgb(0 0 0 / 0.25);
   backdrop-filter: blur(16px);
   opacity: 0;
   transform: translateY(24px);
   pointer-events: none;
   transition:
     opacity 0.3s,
-    transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
+    transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1),
+    height 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 .panel-open {
   opacity: 1;
   transform: none;
   pointer-events: auto;
 }
+.panel-tall {
+  height: calc(100svh - 8.5rem - env(safe-area-inset-bottom));
+}
+.panel-grip {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  display: block;
+  width: 100%;
+  height: 1.4rem;
+  background: rgb(255 255 255 / 0.96);
+}
+.panel-grip::after {
+  content: '';
+  display: block;
+  width: 2.5rem;
+  height: 4px;
+  margin: 0 auto;
+  background: rgb(20 22 26 / 0.2);
+  border-radius: 4px;
+}
 .panel-body {
-  padding: 1.25rem;
+  padding: 0.25rem 1.25rem 1.5rem;
   animation: rise 0.35s ease both;
 }
 @keyframes rise {
@@ -211,30 +227,65 @@ button {
     right: auto;
     bottom: 9rem;
   }
-  .hint {
-    top: 1.5rem;
+  .adjust {
+    top: auto;
+    right: auto;
+    bottom: 4.6rem;
+    left: 2rem;
+    flex-direction: column-reverse;
+    align-items: flex-start;
   }
   .tabs {
-    bottom: 1.5rem;
+    inset: auto auto 1.5rem 50%;
+    translate: -50% 0;
+    display: flex;
+    gap: 0.15rem;
+    padding: 0.3rem;
+    border: 1px solid var(--color-line);
+    border-radius: 999px;
+    box-shadow: 0 10px 30px rgb(20 22 26 / 0.1);
   }
-  .tab {
+  .tab,
+  .tab-home {
+    display: block;
     padding: 0.6rem 1.15rem;
     font-size: 14px;
+    border-radius: 999px;
   }
-  .panel {
-    top: 5.5rem;
-    right: 2rem;
-    bottom: 6rem;
-    left: auto;
+  .tab:hover {
+    color: var(--color-ink);
+  }
+  .tab-icon {
+    display: none;
+  }
+  .tab-on,
+  .tab-on:hover {
+    color: #fff;
+    background: var(--color-accent);
+  }
+  .panel,
+  .panel-tall {
+    inset: 5.5rem 2rem 6rem auto;
     width: min(27rem, 36vw);
     height: auto;
+    border: 1px solid var(--color-line);
+    border-radius: 1.25rem;
+    box-shadow: 0 24px 60px rgb(20 22 26 / 0.16);
     transform: translateX(24px);
   }
   .panel-open {
     transform: none;
   }
+  .panel-grip {
+    display: none;
+  }
   .panel-body {
     padding: 1.75rem;
+  }
+}
+@media (min-width: 1280px) {
+  .adjust {
+    bottom: 1.5rem;
   }
 }
 
