@@ -217,7 +217,14 @@ export function Scene() {
   const pinned = Number(new URLSearchParams(location.search).get('dpr')) || 0
   const [dpr, setDpr] = useState(pinned || Math.min(innerWidth < 768 ? 1.5 : 1.75, window.devicePixelRatio))
   return (
-    <Canvas dpr={dpr} gl={{ antialias: true, powerPreference: 'high-performance', toneMappingExposure: 0.82 }} camera={{ fov: 30, near: 0.04, far: 80, position: [0.6, 0.5, 11.2] }}>
+    <Canvas
+      // Seated with the driver's door open, a tap on the garage outside gets you out.
+      // (Taps that land on the car itself never reach this.)
+      onPointerMissed={() => {
+        const s = useStore.getState()
+        if (s.tab === 'about' && s.open.doorFL) s.set({ tab: 'home' })
+      }}
+      dpr={dpr} gl={{ antialias: true, powerPreference: 'high-performance', toneMappingExposure: 0.82 }} camera={{ fov: 30, near: 0.04, far: 80, position: [0.6, 0.5, 11.2] }}>
       {!pinned && <PerformanceMonitor onDecline={() => setDpr((d) => Math.max(0.9, d - 0.25))} onIncline={() => setDpr((d) => Math.min(1.75, d + 0.25))} />}
       <Suspense fallback={null}>
         <Garage />
