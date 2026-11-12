@@ -1,10 +1,12 @@
 import { experience, profile, projects, skills, tabs, type Tab } from '../data'
-import { useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { useStore } from '../store'
 
 function About() {
+  const set = useStore((s) => s.set)
   return (
     <>
+      {profile.photo && <img src={profile.photo} alt={profile.name} className="mb-4 h-28 w-28 rounded-full object-cover shadow-md ring-4 ring-white" />}
       {profile.about.map((p) => (
         <p key={p} className="mb-3 leading-relaxed text-ink/75">
           {p}
@@ -18,6 +20,10 @@ function About() {
           </div>
         ))}
       </dl>
+      <button className="btn btn-quiet mt-4 !py-2 !text-xs" onClick={() => set({ tab: 'home' })}>
+        Leave the car
+      </button>
+      <p className="mt-2 text-xs text-ink/45">You are in the driver's seat. Drag to look around; clicking the driver's door also gets you out.</p>
       <ul className="mt-4 flex flex-wrap gap-2 text-xs">
         {profile.languages.map((l) => (
           <li key={l.name} className="rounded-full border border-line px-3 py-1.5 text-ink/60">
@@ -129,28 +135,59 @@ function Contact() {
 
 const BODY: Record<Exclude<Tab, 'home'>, () => React.JSX.Element> = { about: About, experience: Experience, projects: Projects, skills: Skills, contact: Contact }
 
+const STEPS = ['peek', 'half', 'tall'] as const
+
 export function Panel() {
-  // Phones: the sheet can be pulled up to nearly full height for reading.
-  const [tall, setTall] = useState(false)
   const tab = useStore((s) => s.tab)
+  const sheet = useStore((s) => s.sheet)
   const set = useStore((s) => s.set)
+  const start = useRef<number | null>(null)
   const open = tab !== 'home'
   const Body = open ? BODY[tab] : null
+
+  useEffect(() => {
+    set({ sheet: 'half' })
+  }, [tab, set])
+
+  // Phones: swipe the header down to tuck the sheet away and play with the car, up to read
+  // more; a tap switches between half and full height.
+  const onDown = (e: React.PointerEvent) => {
+    start.current = e.clientY
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+  const onUp = (e: React.PointerEvent) => {
+    if (start.current === null) return
+    const dy = e.clientY - start.current
+    start.current = null
+    const i = STEPS.indexOf(sheet)
+    if (Math.abs(dy) < 10) set({ sheet: sheet === 'half' ? 'tall' : 'half' })
+    else set({ sheet: STEPS[Math.min(2, Math.max(0, i + (dy > 0 ? -1 : 1)))] })
+  }
+
   return (
-    <section className={`panel ${open ? 'panel-open' : ''} ${tall && open ? 'panel-tall' : ''}`} aria-hidden={!open} inert={!open} aria-labelledby="panel-h">
-      <button className="panel-grip" onClick={() => setTall(!tall)} aria-label={tall ? 'Make the panel smaller' : 'Make the panel taller'} aria-expanded={tall} />
+    <section className={`panel ${open ? `panel-open panel-${sheet}` : ''}`} aria-hidden={!open} inert={!open} aria-labelledby="panel-h">
       {Body && (
-        <div key={tab} className="panel-body">
-          <div className="mb-5 flex items-center justify-between">
-            <h2 id="panel-h" className="text-2xl font-extrabold tracking-tight">
-              {tabs.find((t) => t.id === tab)!.label}
-            </h2>
-            <button className="grid h-9 w-9 place-items-center rounded-full text-xl text-ink/50 hover:bg-ink/6 hover:text-ink" onClick={() => set({ tab: 'home' })} aria-label="Close">
-              ×
-            </button>
+        <>
+          <div className="panel-head" onPointerDown={onDown} onPointerUp={onUp} onPointerCancel={() => (start.current = null)}>
+            <div className="panel-grip" />
+            <div className="flex items-center justify-between">
+              <h2 id="panel-h" className="text-2xl font-extrabold tracking-tight">
+                {tabs.find((t) => t.id === tab)!.label}
+              </h2>
+              <button
+                className="grid h-9 w-9 place-items-center rounded-full text-xl text-ink/50 hover:bg-ink/6 hover:text-ink"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => set({ tab: 'home' })}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
           </div>
-          <Body />
-        </div>
+          <div key={tab} className="panel-body">
+            <Body />
+          </div>
+        </>
       )}
     </section>
   )

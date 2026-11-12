@@ -24,6 +24,7 @@ type State = {
   lights: boolean
   open: Record<Part, boolean>
   adjust: boolean // adjust popover open
+  sheet: 'peek' | 'half' | 'tall' // phones: how far up the content sheet is
   set: (p: Partial<State>) => void
   toggle: (part: Part) => void
 }
@@ -49,6 +50,7 @@ export const useStore = create<State>((set) => ({
   lights: still,
   open: { hood: false, trunk: false, doorFL: false, doorFR: false, doorBL: false, doorBR: false },
   adjust: false,
+  sheet: 'half',
   set: (p) => set(p),
   // Clicking a panel opens it and jumps to its tab; clicking again closes it.
   toggle: (part) => set((s) => (s.open[part] ? { open: { ...s.open, [part]: false } } : { open: { ...s.open, [part]: true }, tab: zones[part].tab })),
