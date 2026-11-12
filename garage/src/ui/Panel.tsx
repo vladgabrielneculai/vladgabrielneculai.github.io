@@ -1,4 +1,5 @@
 import { experience, profile, projects, skills, tabs, type Tab } from '../data'
+import { useState } from 'react'
 import { useStore } from '../store'
 
 function About() {
@@ -129,12 +130,15 @@ function Contact() {
 const BODY: Record<Exclude<Tab, 'home'>, () => React.JSX.Element> = { about: About, experience: Experience, projects: Projects, skills: Skills, contact: Contact }
 
 export function Panel() {
+  // Phones: the sheet can be pulled up to nearly full height for reading.
+  const [tall, setTall] = useState(false)
   const tab = useStore((s) => s.tab)
   const set = useStore((s) => s.set)
   const open = tab !== 'home'
   const Body = open ? BODY[tab] : null
   return (
-    <section className={`panel ${open ? 'panel-open' : ''}`} aria-hidden={!open} inert={!open} aria-labelledby="panel-h">
+    <section className={`panel ${open ? 'panel-open' : ''} ${tall && open ? 'panel-tall' : ''}`} aria-hidden={!open} inert={!open} aria-labelledby="panel-h">
+      <button className="panel-grip" onClick={() => setTall(!tall)} aria-label={tall ? 'Make the panel smaller' : 'Make the panel taller'} aria-expanded={tall} />
       {Body && (
         <div key={tab} className="panel-body">
           <div className="mb-5 flex items-center justify-between">
