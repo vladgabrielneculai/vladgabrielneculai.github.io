@@ -4,7 +4,9 @@ Single-screen portfolio built around a real-time 3D model of my Mazda3 (Machine 
 
 - Drag to turn the car.
 - Click the bonnet, a door, a wheel or the boot to open Skills, About me, Projects or Experience.
-- Tabs turn the car and open a content panel (on phones: a bottom navigation bar and a sheet that can be pulled taller). About me puts you in the driver's seat; drag to look around.
+- Tabs turn the car and open a content panel. On phones: a bottom navigation bar and a sheet; swipe its header down to tuck it away and play with the car, up to read more.
+- About me puts you in the driver's seat. Click the driver's door, or "Leave the car", to get out.
+- The editor's Profile section takes a profile picture; it is stored inside `content.json`. About me puts you in the driver's seat; drag to look around.
 - "Adjust the car": ride height, wheel camber, lights.
 
 ## Stack

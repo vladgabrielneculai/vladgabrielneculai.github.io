@@ -68,6 +68,9 @@ function Rig() {
   const controls = useRef<Controls>(null)
   const moving = useRef(true)
   const stage = useRef(0) // getting in: 0 = walk to the door, 1 = sit down
+  const leaving = useRef(false) // getting out through the driver's door
+  const wasInside = useRef(false)
+  const sheet = useStore((s) => s.sheet)
   const off = useRef({ x: 0, y: 0 })
   const sph = useMemo(() => new THREE.Spherical(), [])
   const rel = useMemo(() => new THREE.Vector3(), [])
@@ -103,7 +106,13 @@ function Rig() {
     if (inside) {
       look.copy(TARGET)
       setDoor(true)
+    } else if (wasInside.current) {
+      // Leaving the seat: open the door and step out before going anywhere else.
+      leaving.current = true
+      look.copy(cam.position).add(cam.getWorldDirection(rel))
+      setDoor(true)
     }
+    wasInside.current = inside
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab])
   useEffect(() => {
@@ -132,12 +141,25 @@ function Rig() {
     const panel = tab !== 'home'
     const playing = intro.t < INTRO_END
     easing.damp(off.current, 'x', portrait || playing ? 0 : size.width * (panel ? 0.17 : -0.19), playing ? 0.01 : 0.3, dt)
-    easing.damp(off.current, 'y', portrait ? size.height * (inside ? 0.3 : panel ? 0.27 : 0.14) : 0, 0.3, dt)
+    // On phones the car sits above the sheet; with the sheet swiped down it gets the screen back.
+    const lifted = panel && sheet !== 'peek'
+    easing.damp(off.current, 'y', portrait ? size.height * (!lifted ? 0.14 : inside ? 0.3 : 0.27) : 0, 0.3, dt)
     cam.fov = portrait ? 50 : inside ? 42 : 30
     cam.setViewOffset(size.width, size.height, off.current.x, off.current.y, size.width, size.height)
 
     if (!moving.current) return
     const c = controls.current
+
+    if (leaving.current) {
+      easing.damp3(cam.position, DOORWAY, 0.35, dt)
+      easing.damp3(look, TARGET, 0.35, dt)
+      cam.lookAt(look)
+      if (cam.position.distanceTo(DOORWAY) < 0.45) {
+        leaving.current = false
+        setDoor(false)
+      }
+      return
+    }
 
     if (inside) {
       // Through the open driver's door and into the seat.
