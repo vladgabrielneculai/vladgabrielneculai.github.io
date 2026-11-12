@@ -50,6 +50,37 @@ type Json = string | number | Json[] | { [k: string]: Json }
 const LONG = new Set(['tagline', 'blurb', 'about', 'notes'])
 const title = (k: string) => k[0].toUpperCase() + k.slice(1)
 
+// Profile picture: cropped to a square, shrunk to 400 px and stored inside content.json
+// itself, so it is saved the same way as the text.
+function Photo({ value, onChange }: { value: string; onChange: (v: Json) => void }) {
+  const pick = async (file: File | undefined) => {
+    if (!file) return
+    const img = await createImageBitmap(file)
+    const side = Math.min(img.width, img.height)
+    const c = document.createElement('canvas')
+    c.width = c.height = 400
+    c.getContext('2d')!.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 400, 400)
+    onChange(c.toDataURL('image/jpeg', 0.85))
+  }
+  return (
+    <div className="ed-field">
+      <span>Profile picture</span>
+      <div className="flex items-center gap-4">
+        {value ? <img src={value} alt="" className="h-20 w-20 rounded-full object-cover" /> : <div className="grid h-20 w-20 place-items-center rounded-full bg-ink/8 text-[11px] font-normal">None</div>}
+        <label className="btn btn-quiet cursor-pointer !py-1.5 !text-xs">
+          {value ? 'Replace' : 'Choose a picture'}
+          <input type="file" accept="image/*" className="hidden" onChange={(e) => pick(e.target.files?.[0])} />
+        </label>
+        {value && (
+          <button className="text-xs font-semibold text-accent" onClick={() => onChange('')}>
+            Remove
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function Field({ name, value, onChange, parent = '' }: { name: string; value: Json; onChange: (v: Json) => void; parent?: string }) {
   if (Array.isArray(value)) {
     const move = (i: number, d: number) => {
@@ -94,6 +125,7 @@ function Field({ name, value, onChange, parent = '' }: { name: string; value: Js
     )
   }
   const label = /^\d+$/.test(name) ? `${title(parent)} ${name}` : title(name)
+  if (name === 'photo' && typeof value === 'string') return <Photo value={value} onChange={onChange} />
   return (
     <label className="ed-field">
       <span>{label}</span>

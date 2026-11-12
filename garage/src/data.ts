@@ -4,6 +4,7 @@
 export type Content = {
   profile: {
     name: string
+    photo: string // data URL of the profile picture, or empty
     role: string
     tagline: string
     location: string
@@ -60,7 +61,7 @@ export async function loadContent() {
   if (!res.ok) throw new Error(`content.json: ${res.status}`)
   const raw = await res.json()
   content = {
-    profile: { ...raw.profile, about: repair(raw.profile?.about, 'about'), links: repair(raw.profile?.links, 'links'), specs: repair(raw.profile?.specs, 'specs'), languages: repair(raw.profile?.languages, 'languages') },
+    profile: { ...raw.profile, photo: typeof raw.profile?.photo === 'string' ? raw.profile.photo : '', about: repair(raw.profile?.about, 'about'), links: repair(raw.profile?.links, 'links'), specs: repair(raw.profile?.specs, 'specs'), languages: repair(raw.profile?.languages, 'languages') },
     experience: repair(raw.experience, 'experience'),
     // "kind" was the old name of a project's type; it now belongs to experience only.
     projects: repair(raw.projects, 'projects').map(({ kind, ...p }: Record<string, string>) => ({ ...p, type: p.type || kind || '' })) as never[],

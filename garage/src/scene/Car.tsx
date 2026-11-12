@@ -498,8 +498,11 @@ export function Car() {
     const zone = zoneOf(e.object)
     if (!zone || Math.hypot(e.clientX - down.current[0], e.clientY - down.current[1]) > 6) return
     e.stopPropagation()
-    if (zone === 'wheel') useStore.getState().set({ tab: zones.wheel.tab })
-    else useStore.getState().toggle(zone)
+    const st = useStore.getState()
+    if (zone === 'wheel') st.set({ tab: zones.wheel.tab })
+    // From the driver's seat, the driver's door is the way out.
+    else if (zone === 'doorFL' && st.tab === 'about') st.set({ tab: 'home' })
+    else st.toggle(zone)
   }
 
   return (
