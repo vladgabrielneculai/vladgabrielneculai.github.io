@@ -2,7 +2,7 @@ import { Environment, Lightformer, MeshReflectorMaterial } from '@react-three/dr
 import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { intro } from '../store'
+import { intro, useStore } from '../store'
 import { Jdm } from './Jdm'
 import { Props } from './Props'
 
@@ -95,11 +95,11 @@ function useTextures() {
 
 function Bar({ i, z }: { i: number; z: number }) {
   const mat = useRef<THREE.MeshBasicMaterial>(null!)
-  const light = useRef<THREE.PointLight>(null!)
+  const light = useRef<THREE.PointLight>(null)
   useFrame(() => {
     const k = barLevel(i, intro.t)
     mat.current.color.setScalar(0.03 + k * 3.2)
-    light.current.intensity = k * 15
+    if (light.current) light.current.intensity = k * 25
   })
   return (
     <group position={[0, ROOM.h - 0.06, z]}>
@@ -111,13 +111,16 @@ function Bar({ i, z }: { i: number; z: number }) {
         <boxGeometry args={[9.7, 0.05, 0.34]} />
         <meshStandardMaterial color="#1c1d1f" roughness={0.6} />
       </mesh>
-      <pointLight ref={light} position={[0, -0.4, 0]} distance={17} decay={1.5} color="#f3f6ff" />
+      {/* Every strip glows, but only every other one casts light: each light is paid for on
+          every pixel of every surface. */}
+      {i % 2 === 0 && <pointLight ref={light} position={[0, -0.4, 0]} distance={22} decay={1.5} color="#f3f6ff" />}
     </group>
   )
 }
 
 export function Garage() {
   const t = useTextures()
+  const lite = useStore((s) => s.lite)
   useFrame(({ scene }) => {
     // The image-based light follows the strips as they come on.
     scene.environmentIntensity = 0.015 + (BARS.reduce((s, _, i) => s + barLevel(i, intro.t), 0) / BARS.length) * 0.985
@@ -157,7 +160,12 @@ export function Garage() {
       {/* Sealed concrete floor with a soft sheen */}
       <mesh rotation-x={-Math.PI / 2}>
         <planeGeometry args={[ROOM.x * 2, ROOM.z * 2]} />
-        <MeshReflectorMaterial resolution={innerWidth < 768 ? 512 : 1024} blur={[380, 110]} mixBlur={1} mixStrength={5} roughness={0.62} depthScale={0.9} minDepthThreshold={0.5} maxDepthThreshold={1.3} color="#3d4043" metalness={0.25} mirror={0} />
+        {lite ? (
+          // Without the mirror the whole scene is drawn once instead of twice.
+          <meshStandardMaterial color="#34373a" roughness={0.32} metalness={0.45} />
+        ) : (
+          <MeshReflectorMaterial resolution={768} blur={[256, 64]} mixBlur={1} mixStrength={5} roughness={0.62} depthScale={0.9} minDepthThreshold={0.5} maxDepthThreshold={1.3} color="#3d4043" metalness={0.25} mirror={0} />
+        )}
       </mesh>
       {/* Bay markings */}
       {[

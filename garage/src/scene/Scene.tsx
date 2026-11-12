@@ -120,6 +120,35 @@ function Rig() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [portrait])
 
+  // While the pointer is dragging, stop hit-testing the car on every move: that work is
+  // only needed for hovering and clicking, and it competes with drawing the next frame.
+  const { gl, setEvents } = useThree()
+  useEffect(() => {
+    const el = gl.domElement
+    let from: [number, number] | null = null
+    const down = (e: PointerEvent) => (from = [e.clientX, e.clientY])
+    const move = (e: PointerEvent) => {
+      if (from && Math.hypot(e.clientX - from[0], e.clientY - from[1]) > 6) {
+        from = null
+        setEvents({ enabled: false })
+      }
+    }
+    const up = () => {
+      from = null
+      setTimeout(() => setEvents({ enabled: true }), 0)
+    }
+    el.addEventListener('pointerdown', down)
+    el.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', up)
+    return () => {
+      el.removeEventListener('pointerdown', down)
+      el.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
+    }
+  }, [gl, setEvents])
+
   useFrame((_, dt) => {
     // Opening sequence: the clock starts once the car has loaded.
     if (frozen !== null) intro.t = frozen
@@ -215,7 +244,8 @@ function Rig() {
 export function Scene() {
   // ?dpr=2 pins the resolution (used for captures); otherwise it adapts to the device.
   const pinned = Number(new URLSearchParams(location.search).get('dpr')) || 0
-  const [dpr, setDpr] = useState(pinned || Math.min(innerWidth < 768 ? 1.5 : 1.75, window.devicePixelRatio))
+  const top = innerWidth < 768 ? 1.25 : 1.5
+  const [dpr, setDpr] = useState(pinned || Math.min(top, window.devicePixelRatio))
   return (
     <Canvas
       // Seated with the driver's door open, a tap on the garage outside gets you out.
@@ -225,7 +255,19 @@ export function Scene() {
         if (s.tab === 'about' && s.open.doorFL) s.set({ tab: 'home' })
       }}
       dpr={dpr} gl={{ antialias: true, powerPreference: 'high-performance', toneMappingExposure: 0.82 }} camera={{ fov: 30, near: 0.04, far: 80, position: [0.6, 0.5, 11.2] }}>
-      {!pinned && <PerformanceMonitor onDecline={() => setDpr((d) => Math.max(0.9, d - 0.25))} onIncline={() => setDpr((d) => Math.min(1.75, d + 0.25))} />}
+      {/* Too slow: first render fewer pixels, then give up the mirrored floor. It never steps back
+          up: changing resolution back and forth is itself a visible hitch. */}
+      {!pinned && (
+        <PerformanceMonitor
+          onDecline={() =>
+            setDpr((d) => {
+              if (d > 1) return d - 0.25
+              useStore.getState().set({ lite: true })
+              return d
+            })
+          }
+        />
+      )}
       <Suspense fallback={null}>
         <Garage />
         <Bvh firstHitOnly>

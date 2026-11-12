@@ -25,6 +25,7 @@ type State = {
   lights: boolean
   open: Record<Part, boolean>
   adjust: boolean // adjust popover open
+  lite: boolean // lighter rendering: no mirrored floor. Phones start in it; slow machines fall back to it.
   sheet: 'peek' | 'half' | 'tall' // phones: how far up the content sheet is
   set: (p: Partial<State>) => void
   toggle: (part: Part) => void
@@ -51,6 +52,7 @@ export const useStore = create<State>((set) => ({
   lights: still,
   open: { hood: false, trunk: false, doorFL: false, doorFR: false, doorBL: false, doorBR: false },
   adjust: false,
+  lite: typeof location !== 'undefined' && (new URLSearchParams(location.search).has('lite') || innerWidth < 768 || matchMedia('(pointer: coarse)').matches),
   sheet: 'half',
   set: (p) => set(p),
   // Clicking a panel opens it and jumps to its tab; clicking again closes it.

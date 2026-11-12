@@ -9,6 +9,10 @@ Single-screen portfolio built around a real-time 3D model of my Mazda3 (Machine 
 - The editor's Profile section takes a profile picture; it is stored inside `content.json`. About me puts you in the driver's seat; drag to look around.
 - "Adjust the car": ride height, wheel camber, lights.
 
+## Performance
+
+The scene adapts to the machine. It starts at up to 1.5x pixel density (1.25x on phones) with a mirrored floor on desktop. If frames drop, it first lowers the pixel density, then replaces the mirror with a plain glossy floor, which halves the drawing work. Phones start without the mirror. Add `?lite` to the address to force the lighter mode.
+
 ## Stack
 
 React 19 · TypeScript · Vite · Three.js via React Three Fiber + drei · Tailwind CSS 4 · Zustand.

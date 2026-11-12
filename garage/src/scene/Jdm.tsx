@@ -427,7 +427,6 @@ function Vending({ a, position, rotation = 0 }: { a: Art; position: V3; rotation
       <mesh position={[0, 0.015, 0]} material={a.frame}>
         <boxGeometry args={[0.96, 0.03, 0.72]} />
       </mesh>
-      <pointLight position={[0, 1.3, 1.0]} intensity={3.5} distance={4.5} decay={2} color="#dfeaff" />
     </group>
   )
 }
@@ -501,7 +500,6 @@ export function Jdm({ room }: { room: { x: number; z: number; h: number } }) {
       <mesh position={[0, 3.78, back + 0.012]} material={a.frame}>
         <boxGeometry args={[4.2, 0.8, 0.024]} />
       </mesh>
-      <pointLight position={[-1.2, 3.5, back + 1.1]} intensity={5} distance={6} decay={2} color="#ff3030" />
       <Framed a={a} mat={a.posters[0]} position={[-4.6, 2.35, back]} />
       <Framed a={a} mat={a.posters[1]} position={[-10.1, 2.35, back]} />
       <Framed a={a} mat={a.posters[3]} position={[4.5, 2.35, back]} />
