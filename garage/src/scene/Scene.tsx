@@ -132,7 +132,7 @@ function Rig() {
     const panel = tab !== 'home'
     const playing = intro.t < INTRO_END
     easing.damp(off.current, 'x', portrait || playing ? 0 : size.width * (panel ? 0.17 : -0.19), playing ? 0.01 : 0.3, dt)
-    easing.damp(off.current, 'y', portrait ? size.height * (panel ? 0.24 : 0.08) : 0, 0.3, dt)
+    easing.damp(off.current, 'y', portrait ? size.height * (inside ? 0.3 : panel ? 0.27 : 0.14) : 0, 0.3, dt)
     cam.fov = portrait ? 50 : inside ? 42 : 30
     cam.setViewOffset(size.width, size.height, off.current.x, off.current.y, size.width, size.height)
 
@@ -193,7 +193,7 @@ function Rig() {
 export function Scene() {
   // ?dpr=2 pins the resolution (used for captures); otherwise it adapts to the device.
   const pinned = Number(new URLSearchParams(location.search).get('dpr')) || 0
-  const [dpr, setDpr] = useState(pinned || Math.min(1.75, window.devicePixelRatio))
+  const [dpr, setDpr] = useState(pinned || Math.min(innerWidth < 768 ? 1.5 : 1.75, window.devicePixelRatio))
   return (
     <Canvas dpr={dpr} gl={{ antialias: true, powerPreference: 'high-performance', toneMappingExposure: 0.82 }} camera={{ fov: 30, near: 0.04, far: 80, position: [0.6, 0.5, 11.2] }}>
       {!pinned && <PerformanceMonitor onDecline={() => setDpr((d) => Math.max(0.9, d - 0.25))} onIncline={() => setDpr((d) => Math.min(1.75, d + 0.25))} />}

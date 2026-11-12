@@ -156,7 +156,7 @@ export function Garage() {
       {/* Sealed concrete floor with a soft sheen */}
       <mesh rotation-x={-Math.PI / 2}>
         <planeGeometry args={[ROOM.x * 2, ROOM.z * 2]} />
-        <MeshReflectorMaterial resolution={1024} blur={[380, 110]} mixBlur={1} mixStrength={5} roughness={0.62} depthScale={0.9} minDepthThreshold={0.5} maxDepthThreshold={1.3} color="#3d4043" metalness={0.25} mirror={0} />
+        <MeshReflectorMaterial resolution={innerWidth < 768 ? 512 : 1024} blur={[380, 110]} mixBlur={1} mixStrength={5} roughness={0.62} depthScale={0.9} minDepthThreshold={0.5} maxDepthThreshold={1.3} color="#3d4043" metalness={0.25} mirror={0} />
       </mesh>
       {/* Bay markings */}
       {[

@@ -3,7 +3,6 @@ import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { easing } from 'maath'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { tabs } from '../data'
 import { useStore, zones, type Part, type Zone } from '../store'
 import { ROOM } from './Garage'
 
@@ -149,6 +148,28 @@ function lampEmissive(map: THREE.Texture) {
   return out
 }
 
+// The cabin texture is a sheet of white button legends on a transparent background, with a
+// row of plain colours along the bottom for everything else. Left as it is, each button
+// renders as a blank white patch. This sets the legends on black switchgear instead, at
+// twice the resolution so they stay readable from the driver's seat.
+function cabinTexture(map: THREE.Texture) {
+  const S = 1024
+  const out = canvas(S, S, (g) => {
+    g.imageSmoothingQuality = 'high'
+    g.fillStyle = '#ffffff'
+    g.fillRect(0, 0, S, S)
+    g.fillStyle = '#141517'
+    g.fillRect(0, S * 0.165, S, S * 0.8)
+    g.drawImage(map.image as CanvasImageSource, 0, 0, S, S)
+  })
+  out.channel = map.channel
+  out.wrapS = map.wrapS
+  out.wrapT = map.wrapT
+  out.generateMipmaps = true
+  out.anisotropy = 16
+  return out
+}
+
 // Where a lamp cluster faces outwards on each side: the average of its most forward
 // (dir = 1) or most rearward (dir = -1) vertices.
 function lampPoints(meshes: THREE.Mesh[], dir: 1 | -1) {
@@ -255,6 +276,7 @@ function rig(scene: THREE.Object3D) {
   // the inner pair.
   const amberLens = new THREE.MeshPhysicalMaterial({ name: 'AmberLens', color: '#f2a007', roughness: 0.08, clearcoat: 1, transparent: true, opacity: 0.78, depthWrite: false, envMapIntensity: 1.4 })
   const clearLens = new THREE.MeshPhysicalMaterial({ name: 'ClearLens', color: '#ffffff', roughness: 0.05, clearcoat: 1, transparent: true, opacity: 0.3, depthWrite: false, envMapIntensity: 1.6 })
+  const screenGlass = new THREE.MeshStandardMaterial({ name: 'ScreenGlass', color: '#000000', roughness: 0.1, transparent: true, opacity: 0.1, depthWrite: false, envMapIntensity: 0.25 })
   const frit = new THREE.MeshStandardMaterial({ name: 'Frit', color: '#050506', roughness: 0.15, metalness: 0.3 })
   const redLens = new THREE.MeshPhysicalMaterial({
     name: 'RedLens',
@@ -286,6 +308,8 @@ function rig(scene: THREE.Object3D) {
       else if (m.name.includes('SM_Light_B')) m.material = amberLens
       // On the tailgate the same material is also the black band round the rear window.
       else if (m.name.includes('SK_Trunk')) splitMaterial(m, clearLens, frit, (p) => p.y < 1.03 && Math.abs(p.x) > 0.15)
+      // In the cabin it is the glass over the instrument cluster and the centre display.
+      else if (m.name.includes('SM_Body')) splitMaterial(m, screenGlass, frit, (p) => p.x > -0.19 && p.x < 0.6 && p.y > 0.8 && p.y < 1.33 && p.z > 0.22 && p.z < 0.66)
       else m.material = frit
     }
     else if (n.includes('Rim_Silver')) m.material = alloy
@@ -294,12 +318,24 @@ function rig(scene: THREE.Object3D) {
       // Discs are the thin round parts; everything else on that material is a caliper.
       const s = boxOf([m]).getSize(new THREE.Vector3())
       m.material = s.x < 0.09 && Math.abs(s.y - s.z) < 0.02 ? discMat : caliper
-    } else {
+    } else if (!old.userData.tuned) {
+      // Materials are shared between many parts: tune each one once.
+      old.userData.tuned = true
       old.transparent = false
       old.depthWrite = true
       old.metalness = 0
       old.roughness = 0.7
-      if (n.includes('Mirror')) {
+      if (n.includes('Cabin') && old.map) {
+        old.map = cabinTexture(old.map)
+        old.roughness = 0.62
+      } else if (n.includes('Dashboard') && old.map) {
+        // Instrument cluster and centre display are screens: they glow.
+        old.map.anisotropy = 16
+        old.emissive.set('#ffffff')
+        old.emissiveMap = old.map
+        old.emissiveIntensity = 1.1
+        old.roughness = 0.25
+      } else if (n.includes('Mirror')) {
         old.metalness = 1
         old.roughness = 0.03
       } else if (n.includes('Light')) {
@@ -451,12 +487,9 @@ export function Car() {
   const onMove = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation()
     const zone = zoneOf(e.object)
-    const hint = zone ? `${zones[zone].name[0].toUpperCase()}${zones[zone].name.slice(1)} — click for ${tabs.find((t) => t.id === zones[zone].tab)!.label}` : null
-    if (useStore.getState().hint !== hint) useStore.getState().set({ hint })
     document.body.style.cursor = zone ? 'pointer' : 'grab'
   }
   const onOut = () => {
-    useStore.getState().set({ hint: null })
     document.body.style.cursor = ''
   }
   // A click only counts if the pointer did not travel: dragging turns the car instead.

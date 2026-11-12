@@ -24,7 +24,6 @@ type State = {
   lights: boolean
   open: Record<Part, boolean>
   adjust: boolean // adjust popover open
-  hint: string | null
   set: (p: Partial<State>) => void
   toggle: (part: Part) => void
 }
@@ -50,7 +49,6 @@ export const useStore = create<State>((set) => ({
   lights: still,
   open: { hood: false, trunk: false, doorFL: false, doorFR: false, doorBL: false, doorBR: false },
   adjust: false,
-  hint: null,
   set: (p) => set(p),
   // Clicking a panel opens it and jumps to its tab; clicking again closes it.
   toggle: (part) => set((s) => (s.open[part] ? { open: { ...s.open, [part]: false } } : { open: { ...s.open, [part]: true }, tab: zones[part].tab })),
