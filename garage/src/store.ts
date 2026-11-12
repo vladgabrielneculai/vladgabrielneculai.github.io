@@ -5,13 +5,14 @@ export type Part = 'hood' | 'trunk' | 'doorFL' | 'doorFR' | 'doorBL' | 'doorBR'
 export type Zone = Part | 'wheel'
 
 // Each clickable area of the car, what to call it, and the tab it leads to.
-export const zones: Record<Zone, { name: string; tab: Tab }> = {
+export const zones: Record<Zone, { name: string; tab: Tab | null }> = {
   hood: { name: 'bonnet', tab: 'skills' },
   wheel: { name: 'wheels', tab: 'projects' },
   doorFL: { name: 'door', tab: 'about' },
-  doorFR: { name: 'door', tab: 'about' },
-  doorBL: { name: 'door', tab: 'about' },
-  doorBR: { name: 'door', tab: 'about' },
+  // only the driver's door leads somewhere; the others just open
+  doorFR: { name: 'door', tab: null },
+  doorBL: { name: 'door', tab: null },
+  doorBR: { name: 'door', tab: null },
   trunk: { name: 'boot', tab: 'experience' },
 }
 
@@ -53,5 +54,5 @@ export const useStore = create<State>((set) => ({
   sheet: 'half',
   set: (p) => set(p),
   // Clicking a panel opens it and jumps to its tab; clicking again closes it.
-  toggle: (part) => set((s) => (s.open[part] ? { open: { ...s.open, [part]: false } } : { open: { ...s.open, [part]: true }, tab: zones[part].tab })),
+  toggle: (part) => set((s) => (s.open[part] ? { open: { ...s.open, [part]: false } } : { open: { ...s.open, [part]: true }, tab: zones[part].tab ?? s.tab })),
 }))

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { useStore, zones, type Part, type Zone } from '../store'
 import { ROOM } from './Garage'
+import { WHEEL_WALL } from './Jdm'
 
 const MODEL = `${import.meta.env.BASE_URL}models/mazda3.glb`
 
@@ -440,16 +441,30 @@ function zoneOf(o: THREE.Object3D | null): Zone | null {
   return null
 }
 
-// A second set of wheels in the corner: three stacked flat, one leaning on the wall.
+// The car's own wheels again, as garage stock: three stacked flat and one leaning in the
+// front corner, and two rows on the wheel wall.
 function SpareWheels({ wheel, radius, width }: { wheel: THREE.Object3D; radius: number; width: number }) {
-  const copies = useMemo(() => [0, 1, 2, 3].map(() => wheel.clone(true)), [wheel])
+  const n = WHEEL_WALL.count
+  const copies = useMemo(() => Array.from({ length: 4 + n * 2 }, () => wheel.clone(true)), [wheel, n])
+  // a wheel resting on two rails 20 cm apart sits this far above them
+  const seat = Math.sqrt(radius * radius - 0.01) + 0.018
   return (
-    <group position={[-ROOM.x + 1.5, 0, ROOM.z - 1.3]}>
-      {copies.slice(0, 3).map((o, i) => (
-        <primitive key={i} object={o} position={[i === 1 ? 0.03 : 0, width / 2 + i * (width + 0.004), i === 2 ? 0.025 : 0]} rotation={[0, i * 0.7, Math.PI / 2]} />
+    <>
+      <group position={[-ROOM.x + 1.5, 0, ROOM.z - 1.3]}>
+        {copies.slice(0, 3).map((o, i) => (
+          <primitive key={i} object={o} position={[i === 1 ? 0.03 : 0, width / 2 + i * (width + 0.004), i === 2 ? 0.025 : 0]} rotation={[0, i * 0.7, Math.PI / 2]} />
+        ))}
+        <primitive object={copies[3]} position={[1.05, radius, 1.3 - width / 2 - 0.09]} rotation={[0.16, Math.PI / 2, 0]} />
+      </group>
+      {copies.slice(4).map((o, i) => (
+        <primitive
+          key={i}
+          object={o}
+          position={[ROOM.x - 0.02 - WHEEL_WALL.inset, WHEEL_WALL.rails[Math.floor(i / n)] + seat, WHEEL_WALL.z0 + (i % n) * WHEEL_WALL.dz]}
+          rotation={[i * 1.3, Math.PI, 0]}
+        />
       ))}
-      <primitive object={copies[3]} position={[1.05, radius, 1.3 - width / 2 - 0.09]} rotation={[0.16, Math.PI / 2, 0]} />
-    </group>
+    </>
   )
 }
 
@@ -506,7 +521,7 @@ export function Car() {
     }
     if (!zone) return
     e.stopPropagation()
-    if (zone === 'wheel') st.set({ tab: zones.wheel.tab })
+    if (zone === 'wheel') st.set({ tab: 'projects' })
     else st.toggle(zone)
   }
 

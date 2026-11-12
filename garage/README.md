@@ -3,7 +3,7 @@
 Single-screen portfolio built around a real-time 3D model of my Mazda3 (Machine Grey, chrome Work Emotion wheels) in a garage. It opens with a short sequence: dark garage, headlamps on, ceiling lights striking one by one. Any click or key skips it; it is skipped automatically for visitors who prefer reduced motion.
 
 - Drag to turn the car.
-- Click the bonnet, a door, a wheel or the boot to open Skills, About me, Projects or Experience.
+- Click the bonnet, the driver's door, a wheel or the boot to open Skills, About me, Projects or Experience. The other doors just open.
 - Tabs turn the car and open a content panel. On phones: a bottom navigation bar and a sheet; swipe its header down to tuck it away and play with the car, up to read more.
 - About me puts you in the driver's seat. To get out, click the driver's door to open it, then click the garage outside; or use "Leave the car".
 - The editor's Profile section takes a profile picture; it is stored inside `content.json`. About me puts you in the driver's seat; drag to look around.
@@ -39,6 +39,8 @@ All text is in `public/content.json`, fetched when the page opens. Two ways to e
 - `src/scene/Car.tsx` — loads the model, finds hinges, wheels and lamps from part bounds, builds paint, glass, brake and lamp materials.
 - `src/scene/Garage.tsx` — the room, its lights and the timing of the opening sequence.
 - `src/scene/Props.tsx` — garage furniture (tool chest, workbench, racks, drums).
+- `src/scene/Jdm.tsx` — the Japanese tuner-garage set: two-post lifts, wheel wall, vending machine, neon sign, posters. All artwork is drawn in code.
+- `src/assets/garage-jp.woff2` — a small subset of Noto Sans JP Black (SIL Open Font License 1.1) for the Japanese lettering.
 - `src/scene/Scene.tsx` — camera views per tab, opening-sequence clock, ground shadow.
 - `src/ui/` — headline, tabs, content panel, adjust popover.
 - `public/models/mazda3.glb` — the car, converted from FBX and compressed (Meshopt + WebP, ~3.6 MB).

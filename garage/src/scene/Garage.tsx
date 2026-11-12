@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { intro } from '../store'
+import { Jdm } from './Jdm'
 import { Props } from './Props'
 
 export const ROOM = { x: 12, z: 13, h: 4.2 }
@@ -214,6 +215,7 @@ export function Garage() {
       </group>
 
       <Props room={ROOM} />
+      <Jdm room={ROOM} />
 
       <hemisphereLight args={['#ffffff', '#3a3c40', 0.12]} />
     </>

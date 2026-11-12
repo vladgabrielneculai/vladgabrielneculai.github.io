@@ -253,7 +253,8 @@ function Workbench({ m, position }: { m: Mats; position: V3 }) {
       <Bottle m={m} position={[0.66, 0.95, -0.1]} mat={m.oilYellow} />
       <Bottle m={m} position={[0.84, 0.95, -0.2]} mat={m.oilBlack} h={0.2} />
       {/* pegboard and a strip light over it, fixed to the wall behind */}
-      <mesh position={[0, 1.72, -0.375]} material={m.pegboard}>
+      {/* 7 mm proud of its backing board: sharing a plane with it made the board flicker */}
+      <mesh position={[0, 1.72, -0.368]} material={m.pegboard}>
         <planeGeometry args={[W, 1.25]} />
       </mesh>
       <mesh position={[0, 1.72, -0.385]} material={m.darkSteel}>
