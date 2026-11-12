@@ -124,7 +124,7 @@
   "projects": [
     {
       "name": "Leuța",
-      "type": "Web Application",
+      "type": "Website & App",
       "year": "2026",
       "blurb": "Leuța is a web application that helps people solve their biggest problem of all time : spending money without knowing where they go. It is an application that is well developed in order to have an idea of your possible credits that are ongoing, maybe your bank accounts (if you have multiple), a food dedicated card and much more. It is dedicated only for the Romanians because the app and the landing page is only writen in this language. Check it out for yourself! ",
       "tags": [
@@ -132,6 +132,20 @@
         "#webapp"
       ],
       "href": "https://www.leuta.ro"
+    },
+    {
+      "name": "The Pace Note",
+      "type": "Website",
+      "year": "2026",
+      "blurb": "This website came from an idea that wanted to revive the idea of watching and knowing informations abour the rally motorsport in Romania. It came at first only as an Instagram page, but soon enough, the website was made. It is still a work in progress, but we are proud to annonce that this website is going to be full of articles, projects and also an online shop from where people can buy merchendise that was made with love from us.",
+      "tags": [
+        "#rally",
+        "#motorsport",
+        "#articles",
+        "#history",
+        "#thepacenote"
+      ],
+      "href": "https://www.thepacenote.ro"
     }
   ],
   "skills": [
