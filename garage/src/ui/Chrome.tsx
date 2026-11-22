@@ -1,5 +1,6 @@
 import { useProgress } from '@react-three/drei'
 import { profile, tabs } from '../data'
+import { starter, unlock } from '../sound'
 import { useStore } from '../store'
 
 // Tab icons for the phone navigation bar (24 px line icons).
@@ -30,6 +31,17 @@ export function Loader() {
   )
 }
 
+function Switch({ label, on, toggle, last }: { label: string; on: boolean; toggle: () => void; last?: boolean }) {
+  return (
+    <button role="switch" aria-checked={on} onClick={toggle} className={`flex w-full items-center justify-between ${last ? '' : 'mb-3'}`}>
+      <span>{label}</span>
+      <span className={`relative h-5 w-9 rounded-full transition-colors ${on ? 'bg-accent' : 'bg-ink/15'}`}>
+        <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${on ? 'left-[1.1rem]' : 'left-0.5'}`} />
+      </span>
+    </button>
+  )
+}
+
 function Adjust() {
   const s = useStore()
   return (
@@ -56,12 +68,33 @@ function Adjust() {
           </span>
           <input type="range" min={0} max={1} step={0.01} value={s.camber} onChange={(e) => s.set({ camber: +e.target.value })} />
         </label>
-        <button role="switch" aria-checked={s.lights} onClick={() => s.set({ lights: !s.lights })} className="flex w-full items-center justify-between">
-          <span>Lights</span>
-          <span className={`relative h-5 w-9 rounded-full transition-colors ${s.lights ? 'bg-accent' : 'bg-ink/15'}`}>
-            <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${s.lights ? 'left-[1.1rem]' : 'left-0.5'}`} />
-          </span>
+        <Switch label="Lights" on={s.lights} toggle={() => s.set({ lights: !s.lights })} />
+        <Switch
+          label="Engine"
+          on={s.engine}
+          toggle={() => {
+            if (!s.engine) starter(0.85)
+            s.set({ engine: !s.engine, rev: false })
+          }}
+        />
+        <button
+          className="btn btn-quiet mb-3 w-full select-none touch-none disabled:opacity-40"
+          disabled={!s.engine}
+          onPointerDown={(e) => {
+            e.currentTarget.setPointerCapture(e.pointerId)
+            unlock()
+            s.set({ rev: true })
+          }}
+          onPointerUp={() => s.set({ rev: false })}
+          onPointerCancel={() => s.set({ rev: false })}
+          onKeyDown={(e) => (e.key === ' ' || e.key === 'Enter') && !e.repeat && s.set({ rev: true })}
+          onKeyUp={() => s.set({ rev: false })}
+          onBlur={() => s.set({ rev: false })}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          Hold to rev
         </button>
+        <Switch label="Sound" on={s.sound} toggle={() => s.set({ sound: !s.sound })} last />
       </div>
     </div>
   )

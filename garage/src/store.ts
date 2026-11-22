@@ -29,6 +29,9 @@ type State = {
   sheet: 'peek' | 'half' | 'tall' // phones: how far up the content sheet is
   shutter: boolean // garage door rolled up onto the street
   flash: number // performance.now() of the last headlamp flash, 0 for none
+  engine: boolean // the Mazda's engine is running
+  rev: boolean // throttle held down
+  sound: boolean // all sound on or muted
   set: (p: Partial<State>) => void
   toggle: (part: Part) => void
 }
@@ -58,6 +61,9 @@ export const useStore = create<State>((set) => ({
   sheet: 'half',
   shutter: false,
   flash: 0,
+  engine: false,
+  rev: false,
+  sound: true,
   set: (p) => set(p),
   // Clicking a panel opens it and jumps to its tab; clicking again closes it.
   toggle: (part) => set((s) => (s.open[part] ? { open: { ...s.open, [part]: false } } : { open: { ...s.open, [part]: true }, tab: zones[part].tab ?? s.tab })),

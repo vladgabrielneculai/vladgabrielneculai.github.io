@@ -5,6 +5,7 @@ import { useGLTF } from '@react-three/drei'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
+import { makeEngine, rain, rattle, type Engine } from '../sound'
 import { useStore } from '../store'
 import { BASE, dress } from './Display'
 import { JP, LATIN, RED, text, texture, useFonts } from './Jdm'
@@ -1017,72 +1018,6 @@ const plainVertex = /* glsl */ `
   void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
 `
 
-// ---------------------------------------------------------------- shutter sound
-
-let audio: AudioContext | null = null
-// Motor hum, the slats rattling over the drum, and a clunk at the end. Synthesised, so there
-// is nothing to download; only ever started by a click.
-function rattle(seconds: number) {
-  try {
-    audio ??= new AudioContext()
-    const ctx = audio
-    void ctx.resume()
-    const now = ctx.currentTime
-    const out = ctx.createGain()
-    out.gain.value = 0.16
-    out.connect(ctx.destination)
-
-    const noise = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * (seconds + 0.5)), ctx.sampleRate)
-    const d = noise.getChannelData(0)
-    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1
-    const src = ctx.createBufferSource()
-    src.buffer = noise
-    const band = ctx.createBiquadFilter()
-    band.type = 'bandpass'
-    band.frequency.value = 2200
-    band.Q.value = 0.9
-    const clicks = ctx.createGain()
-    clicks.gain.setValueAtTime(0, now)
-    for (let t = 0.05; t < seconds; t += 0.055 + Math.random() * 0.02) {
-      clicks.gain.setValueAtTime(0.55, now + t)
-      clicks.gain.exponentialRampToValueAtTime(0.02, now + t + 0.03)
-    }
-    clicks.gain.setValueAtTime(0, now + seconds)
-    src.connect(band).connect(clicks).connect(out)
-    src.start(now)
-    src.stop(now + seconds + 0.4)
-
-    const motor = ctx.createOscillator()
-    motor.type = 'sawtooth'
-    motor.frequency.value = 92
-    const low = ctx.createBiquadFilter()
-    low.type = 'lowpass'
-    low.frequency.value = 320
-    const hum = ctx.createGain()
-    hum.gain.setValueAtTime(0, now)
-    hum.gain.linearRampToValueAtTime(0.22, now + 0.15)
-    hum.gain.setValueAtTime(0.22, now + seconds - 0.15)
-    hum.gain.linearRampToValueAtTime(0, now + seconds)
-    motor.connect(low).connect(hum).connect(out)
-    motor.start(now)
-    motor.stop(now + seconds + 0.1)
-
-    const thud = ctx.createOscillator()
-    thud.frequency.setValueAtTime(110, now + seconds)
-    thud.frequency.exponentialRampToValueAtTime(45, now + seconds + 0.25)
-    const tg = ctx.createGain()
-    tg.gain.setValueAtTime(0, now)
-    tg.gain.setValueAtTime(0, now + seconds)
-    tg.gain.linearRampToValueAtTime(0.9, now + seconds + 0.01)
-    tg.gain.exponentialRampToValueAtTime(0.001, now + seconds + 0.35)
-    thud.connect(tg).connect(out)
-    thud.start(now + seconds)
-    thud.stop(now + seconds + 0.4)
-  } catch {
-    // no sound available: the door still works
-  }
-}
-
 // ---------------------------------------------------------------- scene
 
 function useArt(ready: boolean, lite: boolean) {
@@ -1202,13 +1137,15 @@ const PAINTS = [
 type Traffic = { x: number; lane: number; model: number; colour: string; id: number; wait: number; live: boolean }
 type Art = NonNullable<ReturnType<typeof useArt>>
 
-function Cars({ a, traffic, wall }: { a: Art; traffic: React.RefObject<Traffic>; wall: number }) {
+const SPEED = 8.5 // m/s, about 30 km/h
+
+function Cars({ a, traffic, door, wall }: { a: Art; traffic: React.RefObject<Traffic>; door: React.RefObject<{ up: number }>; wall: number }) {
   const sti = useGLTF(BASE + MODELS[0].file, false, true)
   const mx5 = useGLTF(BASE + MODELS[1].file, false, true)
   const cars = useMemo(
     () =>
       [sti.scene, mx5.scene].map((scene, i) => {
-        const d = dress(scene, MODELS[i].length)
+        const d = dress(scene, MODELS[i].length, undefined, true)
         // Out in the night street the garage's reflections should barely reach them.
         d.car.traverse((o) => {
           const m = (o as THREE.Mesh).material
@@ -1223,13 +1160,30 @@ function Cars({ a, traffic, wall }: { a: Art; traffic: React.RefObject<Traffic>;
   const lights = useRef<THREE.Group>(null)
   const parts = useRef<Record<string, THREE.Object3D | null>>({})
   const last = useRef(-1)
+  const voice = useRef<Engine | null>(null)
+  useEffect(() => () => voice.current?.stop(), [])
 
-  useFrame(() => {
+  useFrame((_, dt) => {
     const tr = traffic.current
     const p = parts.current
     if (!body.current || !lights.current || !tr) return
     body.current.visible = lights.current.visible = tr.live
-    if (!tr.live) return
+    // Engine and tyres on the wet road, louder as the car nears the door, panned with it,
+    // with a touch of Doppler. Muffled to nothing as the shutter comes down.
+    voice.current ??= makeEngine()
+    if (!tr.live) {
+      voice.current?.set(0, 0, 0)
+      return
+    }
+    {
+      const lane = LANES[tr.lane]
+      const d = Math.hypot(tr.x, lane.z + 6) // the listener stands about 6 m inside the door
+      const away = (lane.dir * SPEED * tr.x) / d // m/s, positive when moving away
+      const level = (door.current?.up ?? 0) / (1 + (d / 7) ** 2)
+      voice.current?.set((tr.model ? 2600 : 2300) * (343 / (343 + away)), 0.35, level * 1.6, tr.x / 9, tr.model ? 0 : 1, level * 1.4)
+      // wheels roll with the road
+      for (const w of cars[tr.model].wheels) w.pivot.rotation.x += (SPEED * dt) / w.radius
+    }
     const m = MODELS[tr.model]
     const lane = LANES[tr.lane]
     if (last.current !== tr.id) {
@@ -1298,7 +1252,7 @@ export function Street({ room }: { room: Room }) {
   const lite = useStore((s) => s.lite)
   const a = useArt(ready, lite)
 
-  const k = useRef({ t: 0, flashed: true }) // t: 0 shut .. 1 fully up
+  const k = useRef({ t: 0, up: 0, flashed: true }) // t: 0 shut .. 1 fully up; up: t eased
   const door = useRef<THREE.Mesh>(null)
   const bar = useRef<THREE.Group>(null)
   const street = useRef<THREE.Group>(null)
@@ -1337,6 +1291,9 @@ export function Street({ room }: { room: Room }) {
     bar.current.position.y = OPENING.h * up
     street.current.visible = st.t > 0
     spill.current.opacity = up * 0.3
+    // rain heard through the doorway, as far as it is open
+    if (up > 0 || st.up > 0) rain(up)
+    st.up = up
     if (!street.current.visible) {
       sweep.current.opacity = 0
       return
@@ -1362,7 +1319,7 @@ export function Street({ room }: { room: Room }) {
         tr.x = -LANES[tr.lane].dir * (WIDTH / 2 + 4)
       }
     } else {
-      tr.x += LANES[tr.lane].dir * dt * 8.5
+      tr.x += LANES[tr.lane].dir * dt * SPEED
       if (Math.abs(tr.x) > WIDTH / 2 + 4) {
         tr.live = false
         tr.wait = 3 + Math.random() * 6
@@ -1480,7 +1437,7 @@ export function Street({ room }: { room: Room }) {
 
         {opened && (
           <Suspense fallback={null}>
-            <Cars a={a} traffic={traffic} wall={wall} />
+            <Cars a={a} traffic={traffic} door={k} wall={wall} />
           </Suspense>
         )}
       </group>

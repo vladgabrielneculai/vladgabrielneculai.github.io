@@ -3,6 +3,7 @@ import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { easing } from 'maath'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { makeEngine, type Engine } from '../sound'
 import { useStore, zones, type Part, type Zone } from '../store'
 import { ROOM } from './Garage'
 import { WHEEL_WALL } from './Jdm'
@@ -12,6 +13,8 @@ const MODEL = `${import.meta.env.BASE_URL}models/mazda3.glb`
 const LENGTH = 4.46 // metres, Mazda3 BP hatchback
 const MAX_DROP = 0.045 // metres
 const MAX_CAMBER = 0.105 // radians (6°)
+const CRANK = 0.85 // seconds on the starter before the engine catches
+const IDLE = 780 // rpm
 
 // Open angle and hinge axis per moving panel. After normalising, the car faces +z and y is up.
 const OPEN: Record<Part, { axis: 'x' | 'y'; angle: number }> = {
@@ -472,6 +475,10 @@ export function Car() {
   const { scene } = useGLTF(MODEL, false, true)
   const r = useMemo(() => rig(scene), [scene])
   const v = useRef({ drop: 0, camber: 0, lights: 0 })
+  // The engine: whether it is running, since when, its speed, throttle, and how the body moves
+  // on its mounts and springs.
+  const eng = useRef({ on: false, t0: 0, rpm: 0, prev: 0, throttle: 0, roll: 0, pitch: 0, voice: null as Engine | null })
+  useEffect(() => () => eng.current.voice?.stop(), [])
   const down = useRef<[number, number]>([0, 0])
 
   useEffect(() => {
@@ -490,6 +497,36 @@ export function Car() {
     easing.damp(a, 'drop', s.drop * MAX_DROP, 0.2, dt)
     easing.damp(a, 'camber', s.camber * MAX_CAMBER, 0.2, dt)
     r.car.position.y = -a.drop
+
+    // Engine: the starter turns it over, it catches with a flare of revs and settles to idle;
+    // held throttle sends it to the limiter. The body shakes at idle, rocks as it starts, and
+    // rolls against the torque as the revs climb.
+    const e = eng.current
+    const now = performance.now() / 1000
+    if (s.engine !== e.on) {
+      e.on = s.engine
+      if (e.on) e.t0 = now
+    }
+    if (e.on) e.voice ??= makeEngine()
+    const running = now - e.t0
+    const cranking = e.on && running < CRANK
+    const target = !e.on ? 0 : cranking ? 230 : running < CRANK + 0.5 ? 1600 : s.rev ? 6900 : IDLE
+    const rate = target > e.rpm ? (s.rev ? 6500 : 5000) : e.on ? 2600 : 1400
+    e.prev = e.rpm
+    e.rpm = target > e.rpm ? Math.min(target, e.rpm + rate * dt) : Math.max(target, e.rpm - rate * dt)
+    if (s.rev && e.rpm >= 6850) e.rpm = 6350 // bouncing off the limiter
+    easing.damp(e, 'throttle', e.on && !cranking && (s.rev || running < CRANK + 0.35) ? 1 : 0, 0.05, dt)
+    e.voice?.set(e.rpm, e.throttle, cranking ? 0.45 : 1)
+
+    const load = e.on && !cranking ? Math.min(1, Math.max(0, (e.rpm - IDLE) / 6000)) : 0
+    const torque = THREE.MathUtils.clamp((e.rpm - e.prev) / Math.max(dt, 1e-3) / 25000, -1, 1)
+    easing.damp(e, 'roll', e.on ? torque * 0.02 + load * 0.016 : 0, 0.14, dt)
+    easing.damp(e, 'pitch', -load * 0.007, 0.2, dt)
+    const amp = !e.on ? 0 : cranking ? 0.0045 : 0.0009 + load * 0.0009
+    const hz = cranking ? 7.5 : 11 + load * 30
+    const shake = amp * (Math.sin(now * Math.PI * 2 * hz) + 0.5 * Math.sin(now * Math.PI * 2 * hz * 1.73))
+    r.car.rotation.z = e.roll + shake
+    r.car.rotation.x = e.pitch + shake * 0.35
     // Negative camber: the top of each wheel leans in towards the body.
     for (const w of r.wheels) w.pivot.rotation.z = w.side * a.camber
 

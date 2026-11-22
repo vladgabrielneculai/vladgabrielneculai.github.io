@@ -37,7 +37,7 @@ export const BAYS = DISPLAY.map((s) => ({ x: s.position[0], z: s.position[2], hx
 // become cut-outs so they sort correctly.
 // Returns a copy of the model at real size, wheels on the ground, centred, facing +z, with its
 // own paint materials so each copy can be resprayed.
-export function dress(scene: THREE.Object3D, length: number, colour?: string) {
+export function dress(scene: THREE.Object3D, length: number, colour?: string, wheels = false) {
   const root = scene.clone(true)
   const done = new Map<THREE.Material, THREE.Material>()
   const paints: THREE.MeshPhysicalMaterial[] = []
@@ -83,7 +83,73 @@ export function dress(scene: THREE.Object3D, length: number, colour?: string) {
   root.position.sub(new THREE.Vector3(c.x, box.min.y, c.z))
   const car = new THREE.Group()
   car.add(root)
-  return { car, paints }
+  return { car, paints, wheels: wheels ? splitWheels(car) : [] }
+}
+
+// The models come with all four wheels merged into a few meshes per material, so to make them
+// turn, the wheel triangles are sorted by corner into four new meshes, each hung on a pivot at
+// its hub. Brake calipers stay put. Works in the dressed car's space: x across, z along.
+const ROLLING = /Tyre|Tire_Disk|Wheel1A|Rim/
+function splitWheels(car: THREE.Group) {
+  car.updateMatrixWorld(true)
+  const meshes: THREE.Mesh[] = []
+  car.traverse((o) => {
+    const m = o as THREE.Mesh
+    if (m.isMesh && !Array.isArray(m.material) && ROLLING.test(m.material.name) && !/Brake/.test(m.material.name)) meshes.push(m)
+  })
+  const corner = (p: THREE.Vector3) => (p.x > 0 ? 1 : 0) + (p.z > 0 ? 2 : 0)
+  const v = new THREE.Vector3()
+
+  // hub centre and radius of each wheel, from the extent of its parts
+  const boxes = [0, 1, 2, 3].map(() => new THREE.Box3())
+  for (const m of meshes) {
+    const pos = m.geometry.attributes.position
+    for (let i = 0; i < pos.count; i++) boxes[corner(v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld))].expandByPoint(v)
+  }
+  if (boxes.some((b) => b.isEmpty())) return []
+  const hubs = boxes.map((b) => {
+    const pivot = new THREE.Group()
+    pivot.position.copy(b.getCenter(new THREE.Vector3()))
+    car.add(pivot)
+    return { pivot, radius: (b.max.y - b.min.y) / 2 }
+  })
+
+  const n = new THREE.Vector3()
+  const normalMatrix = new THREE.Matrix3()
+  for (const m of meshes) {
+    const g = m.geometry
+    const pos = g.attributes.position
+    const nor = g.attributes.normal
+    const uv = g.attributes.uv
+    normalMatrix.getNormalMatrix(m.matrixWorld)
+    const out = hubs.map(() => ({ p: [] as number[], n: [] as number[], t: [] as number[] }))
+    const count = g.index ? g.index.count : pos.count
+    const tri = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]
+    for (let i = 0; i < count; i += 3) {
+      const ids = [0, 1, 2].map((k) => (g.index ? g.index.getX(i + k) : i + k))
+      ids.forEach((id, k) => tri[k].fromBufferAttribute(pos, id).applyMatrix4(m.matrixWorld))
+      const w = corner(v.copy(tri[0]).add(tri[1]).add(tri[2]).divideScalar(3))
+      const hub = hubs[w].pivot.position
+      ids.forEach((id, k) => {
+        out[w].p.push(tri[k].x - hub.x, tri[k].y - hub.y, tri[k].z - hub.z)
+        if (nor) {
+          n.fromBufferAttribute(nor, id).applyMatrix3(normalMatrix).normalize()
+          out[w].n.push(n.x, n.y, n.z)
+        }
+        if (uv) out[w].t.push(uv.getX(id), uv.getY(id))
+      })
+    }
+    out.forEach((o, w) => {
+      if (!o.p.length) return
+      const geo = new THREE.BufferGeometry()
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(o.p, 3))
+      if (o.n.length) geo.setAttribute('normal', new THREE.Float32BufferAttribute(o.n, 3))
+      if (o.t.length) geo.setAttribute('uv', new THREE.Float32BufferAttribute(o.t, 2))
+      hubs[w].pivot.add(new THREE.Mesh(geo, m.material))
+    })
+    m.removeFromParent()
+  }
+  return hubs
 }
 
 function prepare(scene: THREE.Object3D, spec: Spec) {
