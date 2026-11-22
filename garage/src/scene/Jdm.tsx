@@ -4,6 +4,7 @@ import { RoundedBox } from '@react-three/drei'
 import { useEffect, useMemo, useState } from 'react'
 import * as THREE from 'three'
 import jpFont from '../assets/garage-jp.woff2?url'
+import { LIFT_UP } from './Display'
 
 type V3 = [number, number, number]
 type G = CanvasRenderingContext2D
@@ -490,8 +491,9 @@ export function Jdm({ room }: { room: { x: number; z: number; h: number } }) {
   return (
     <>
       {/* working bays either side of the car */}
-      <Lift a={a} position={[-6.4, 0, -5]} />
-      <Lift a={a} position={[6.4, 0, -5]} />
+      {/* the Impreza is up on the left one; the right one's arms are down under the MX-5 */}
+      <Lift a={a} position={[-6.4, 0, -5]} height={LIFT_UP} />
+      <Lift a={a} position={[6.4, 0, -5]} height={0.02} />
 
       {/* back wall: neon over the door, prints between the door and the benches */}
       <mesh position={[0, 3.78, back + 0.03]} material={a.neon}>

@@ -48,3 +48,4 @@ All text is in `public/content.json`, fetched when the page opens. Two ways to e
 - `src/scene/Scene.tsx` — camera views per tab, opening-sequence clock, ground shadow.
 - `src/ui/` — headline, tabs, content panel, adjust popover.
 - `public/models/mazda3.glb` — the car, converted from FBX and compressed (Meshopt + WebP, ~3.6 MB).
+- `public/models/impreza-sti.glb`, `public/models/mx5.glb` — the cars in the side bays (~1.1 MB each), loaded after the Mazda so they never delay the opening. CC BY-NC-SA 4.0, see `public/models/CREDITS.md`. Placement and lift height live in `src/scene/Display.tsx`.

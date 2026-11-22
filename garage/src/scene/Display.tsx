@@ -1,0 +1,111 @@
+import { useGLTF } from '@react-three/drei'
+import { useMemo } from 'react'
+import * as THREE from 'three'
+
+// The other cars in the garage. Both models are by Ddiaz Design on Sketchfab, CC BY-NC-SA 4.0
+// (credited in the Contact panel and in public/models/CREDITS.md).
+const BASE = `${import.meta.env.BASE_URL}models/`
+
+// Lift arm height for the car that is up in the air, shared with the lift drawn in Jdm.tsx.
+export const LIFT_UP = 1.2
+// Top of the rubber pads above the carriage height (see Lift in Jdm.tsx).
+const PAD_TOP = 0.125
+
+type Spec = {
+  file: string
+  length: number // metres, bumper to bumper
+  position: [number, number, number] // bay centre on the floor
+  rotation: number // about y; 0 faces the front of the garage
+  lift?: { height: number; sill: number } // raised on a lift: arm height and the car's sill height
+  paint?: string // respray, sRGB
+}
+
+export const DISPLAY: Spec[] = [
+  // 2006 Impreza WRX STI, up on the left lift, in WR Blue on its gold wheels.
+  { file: 'impreza-sti.glb', length: 4.465, position: [-6.4, 0, -5], rotation: 0, lift: { height: LIFT_UP, sill: 0.2 }, paint: '#1c3f94' },
+  // 2015 MX-5 (ND) parked in the right bay, in its Soul Red.
+  { file: 'mx5.glb', length: 3.915, position: [6.4, 0, -5], rotation: 0 },
+]
+
+// Floor area the orbiting camera must stay out of around each parked car: the car plus the
+// lift posts either side of it, with some room to spare.
+export const BAYS = DISPLAY.map((s) => ({ x: s.position[0], z: s.position[2], hx: 1.75, hz: s.length / 2 + 0.15 }))
+
+// Sketchfab exports glass as transmissive, which costs a second render of the whole scene
+// every frame, and gives every part the physical shader's extra layers. Plain alpha and the
+// standard shader look the same at this distance. Opaque parts that were exported as blended
+// become cut-outs so they sort correctly.
+function prepare(scene: THREE.Object3D, spec: Spec) {
+  const root = scene.clone(true)
+  const done = new Map<THREE.Material, THREE.Material>()
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh
+    if (!mesh.isMesh) return
+    const fix = (m: THREE.Material) => {
+      const hit = done.get(m)
+      if (hit) return hit
+      const src = m as THREE.MeshPhysicalMaterial
+      const paint = /CarPaint(Normal)?_Max/.test(src.name)
+      // Only the paint keeps its clear coat; everything else gets the cheaper standard shader.
+      const c = paint ? src.clone() : new THREE.MeshStandardMaterial().copy(src)
+      const glass = src.transmission > 0 || /Glass_Window|LightGlass|SoftPlastic/.test(c.name)
+      if (glass) {
+        c.transparent = true
+        c.depthWrite = false
+        c.opacity = Math.max(c.opacity, /Clear/.test(c.name) ? 0.28 : /Window|SoftPlastic/.test(c.name) ? 0.38 : 0.55)
+        c.roughness = Math.min(c.roughness, 0.05)
+      } else if (c.transparent) {
+        c.transparent = false
+        c.alphaTest = 0.5
+        c.depthWrite = true
+      }
+      if (paint && c instanceof THREE.MeshPhysicalMaterial) {
+        if (spec.paint) c.color.set(spec.paint)
+        c.transmission = 0
+        c.clearcoat = 1
+        c.clearcoatRoughness = 0.04
+      }
+      c.envMapIntensity = 1
+      done.set(m, c)
+      return c
+    }
+    mesh.material = Array.isArray(mesh.material) ? mesh.material.map(fix) : fix(mesh.material)
+  })
+
+  // Scale to real size, wheels on the ground, centred on the bay.
+  const box = new THREE.Box3().setFromObject(root)
+  const k = spec.length / (box.max.z - box.min.z)
+  root.scale.multiplyScalar(k)
+  box.setFromObject(root)
+  const c = box.getCenter(new THREE.Vector3())
+  root.position.sub(new THREE.Vector3(c.x, box.min.y, c.z))
+
+  const out = new THREE.Group()
+  out.add(root)
+  out.position.set(...spec.position)
+  if (spec.lift) out.position.y += spec.lift.height + PAD_TOP - spec.lift.sill
+  out.rotation.y = spec.rotation
+  // Nothing here moves: work out the matrices once.
+  out.traverse((o) => {
+    o.updateMatrix()
+    o.matrixAutoUpdate = false
+  })
+  out.updateMatrixWorld(true)
+  return out
+}
+
+function Parked({ spec }: { spec: Spec }) {
+  const { scene } = useGLTF(BASE + spec.file, false, true)
+  const car = useMemo(() => prepare(scene, spec), [scene, spec])
+  return <primitive object={car} />
+}
+
+export function Display() {
+  return (
+    <>
+      {DISPLAY.map((s) => (
+        <Parked key={s.file} spec={s} />
+      ))}
+    </>
+  )
+}

@@ -129,6 +129,17 @@ function Contact() {
         ))}
       </div>
       <p className="mt-6 text-xs text-ink/45">Based in {profile.location}.</p>
+      <p className="mt-2 text-[11px] leading-relaxed text-ink/40">
+        Impreza WRX STI and MX-5 models by{' '}
+        <a href="https://sketchfab.com/ddiaz-design" target="_blank" rel="noreferrer" className="underline">
+          Ddiaz Design
+        </a>
+        ,{' '}
+        <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noreferrer" className="underline">
+          CC BY-NC-SA 4.0
+        </a>
+        .
+      </p>
     </>
   )
 }

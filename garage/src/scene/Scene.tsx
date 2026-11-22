@@ -7,6 +7,7 @@ import type { OrbitControls as Controls } from 'three-stdlib'
 import type { Tab } from '../data'
 import { INTRO_END, intro, useStore } from '../store'
 import { Car } from './Car'
+import { BAYS, Display } from './Display'
 import { Garage } from './Garage'
 
 // Where the car turns to for each tab: azimuth and elevation in degrees, distance in metres.
@@ -16,9 +17,32 @@ const VIEWS: Record<Tab, { az: number; el: number; r: number }> = {
   experience: { az: 148, el: 11, r: 8.4 },
   projects: { az: -42, el: 7, r: 7.4 },
   skills: { az: 12, el: 24, r: 8 },
-  contact: { az: -140, el: 10, r: 8.4 },
+  contact: { az: -152, el: 10, r: 8.4 }, // clear of the Impreza on its lift
 }
 const TARGET = new THREE.Vector3(0, 0.62, 0)
+const MAX_R = 11.2
+
+// How far the camera may orbit out along the horizontal direction (dx, dz) before it would
+// enter a bay with a parked car: where the ray from the car first meets a bay rectangle.
+function reach(dx: number, dz: number) {
+  let best = Infinity
+  for (const b of BAYS) {
+    let near = 0
+    let far = Infinity
+    for (const [o, d, h] of [[b.x, dx, b.hx], [b.z, dz, b.hz]]) {
+      if (Math.abs(d) < 1e-6) {
+        if (Math.abs(o) > h) near = Infinity
+        continue
+      }
+      const t1 = (o - h) / d
+      const t2 = (o + h) / d
+      near = Math.max(near, Math.min(t1, t2))
+      far = Math.min(far, Math.max(t1, t2))
+    }
+    if (near <= far) best = Math.min(best, near)
+  }
+  return best
+}
 
 // Soft shadow under the car: one painted texture instead of re-rendering the car from below
 // every frame. A broad pool under the body plus a tighter, darker contact patch at each tyre.
@@ -176,8 +200,20 @@ function Rig() {
     cam.fov = portrait ? 50 : inside ? 42 : 30
     cam.setViewOffset(size.width, size.height, off.current.x, off.current.y, size.width, size.height)
 
-    if (!moving.current) return
     const c = controls.current
+    if (!moving.current) {
+      // Orbiting freely: pull the outer limit in where a parked car is in the way.
+      if (c && !inside) {
+        rel.copy(cam.position).sub(TARGET)
+        const h = Math.hypot(rel.x, rel.z)
+        if (h > 1e-3) {
+          const room = reach(rel.x / h, rel.z / h) - 0.1
+          const s = h / rel.length() // sin of the polar angle: horizontal share of the radius
+          c.maxDistance = Math.max(c.minDistance, Math.min(MAX_R, room / s))
+        }
+      }
+      return
+    }
 
     if (leaving.current) {
       easing.damp3(cam.position, DOORWAY, 0.35, dt)
@@ -230,7 +266,7 @@ function Rig() {
       moving.current = false
       if (c) {
         c.minDistance = 4.5
-        c.maxDistance = 11.2
+        c.maxDistance = MAX_R
         c.minPolarAngle = 0.5
         c.maxPolarAngle = Math.PI / 2 - 0.03
         c.enabled = true
@@ -242,6 +278,7 @@ function Rig() {
 }
 
 export function Scene() {
+  const ready = useStore((s) => s.ready)
   // ?dpr=2 pins the resolution (used for captures); otherwise it adapts to the device.
   const pinned = Number(new URLSearchParams(location.search).get('dpr')) || 0
   const top = innerWidth < 768 ? 1.25 : 1.5
@@ -275,6 +312,12 @@ export function Scene() {
         </Bvh>
         <GroundShadow />
       </Suspense>
+      {/* The other cars load once the Mazda is on screen, so they never hold up the opening. */}
+      {ready && (
+        <Suspense fallback={null}>
+          <Display />
+        </Suspense>
+      )}
       <Rig />
     </Canvas>
   )
