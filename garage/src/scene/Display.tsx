@@ -4,7 +4,7 @@ import * as THREE from 'three'
 
 // The other cars in the garage. Both models are by Ddiaz Design on Sketchfab, CC BY-NC-SA 4.0
 // (credited in the Contact panel and in public/models/CREDITS.md).
-const BASE = `${import.meta.env.BASE_URL}models/`
+export const BASE = `${import.meta.env.BASE_URL}models/`
 
 // Lift arm height for the car that is up in the air, shared with the lift drawn in Jdm.tsx.
 export const LIFT_UP = 1.2
@@ -35,9 +35,12 @@ export const BAYS = DISPLAY.map((s) => ({ x: s.position[0], z: s.position[2], hx
 // every frame, and gives every part the physical shader's extra layers. Plain alpha and the
 // standard shader look the same at this distance. Opaque parts that were exported as blended
 // become cut-outs so they sort correctly.
-function prepare(scene: THREE.Object3D, spec: Spec) {
+// Returns a copy of the model at real size, wheels on the ground, centred, facing +z, with its
+// own paint materials so each copy can be resprayed.
+export function dress(scene: THREE.Object3D, length: number, colour?: string) {
   const root = scene.clone(true)
   const done = new Map<THREE.Material, THREE.Material>()
+  const paints: THREE.MeshPhysicalMaterial[] = []
   root.traverse((o) => {
     const mesh = o as THREE.Mesh
     if (!mesh.isMesh) return
@@ -60,7 +63,8 @@ function prepare(scene: THREE.Object3D, spec: Spec) {
         c.depthWrite = true
       }
       if (paint && c instanceof THREE.MeshPhysicalMaterial) {
-        if (spec.paint) c.color.set(spec.paint)
+        if (colour) c.color.set(colour)
+        paints.push(c)
         c.transmission = 0
         c.clearcoat = 1
         c.clearcoatRoughness = 0.04
@@ -72,14 +76,18 @@ function prepare(scene: THREE.Object3D, spec: Spec) {
     mesh.material = Array.isArray(mesh.material) ? mesh.material.map(fix) : fix(mesh.material)
   })
 
-  // Scale to real size, wheels on the ground, centred on the bay.
   const box = new THREE.Box3().setFromObject(root)
-  const k = spec.length / (box.max.z - box.min.z)
-  root.scale.multiplyScalar(k)
+  root.scale.multiplyScalar(length / (box.max.z - box.min.z))
   box.setFromObject(root)
   const c = box.getCenter(new THREE.Vector3())
   root.position.sub(new THREE.Vector3(c.x, box.min.y, c.z))
+  const car = new THREE.Group()
+  car.add(root)
+  return { car, paints }
+}
 
+function prepare(scene: THREE.Object3D, spec: Spec) {
+  const root = dress(scene, spec.length, spec.paint).car
   const out = new THREE.Group()
   out.add(root)
   out.position.set(...spec.position)

@@ -1,10 +1,12 @@
 // The garage door: a roller shutter with a painted mural that rolls up onto a rainy night
 // street. The street is painted, not modelled: a shop-front backdrop, a wet road, rain, and
 // now and then a car's headlamps sweeping past. All artwork is original and drawn here.
+import { useGLTF } from '@react-three/drei'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
-import { useMemo, useRef } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { useStore } from '../store'
+import { BASE, dress } from './Display'
 import { JP, LATIN, RED, text, texture, useFonts } from './Jdm'
 
 type G = CanvasRenderingContext2D
@@ -967,63 +969,6 @@ function radial(rgb: string, size = 128) {
   })
 }
 
-// Side view of an ordinary saloon at night, mostly in shadow (4.4 m x 1.45 m), facing right.
-function silhouette(g: G) {
-  g.scale(512 / 4.4, 168 / 1.45)
-  const y = (h: number) => 1.45 - h
-  g.fillStyle = '#08090c'
-  g.beginPath()
-  g.moveTo(0.08, y(0.32))
-  g.lineTo(0.05, y(0.72))
-  g.quadraticCurveTo(0.2, y(0.95), 0.9, y(1.0))
-  g.quadraticCurveTo(1.3, y(1.42), 2.1, y(1.43))
-  g.quadraticCurveTo(2.9, y(1.42), 3.25, y(1.0))
-  g.quadraticCurveTo(4.1, y(0.92), 4.36, y(0.72))
-  g.lineTo(4.36, y(0.3))
-  g.lineTo(3.86, y(0.3))
-  g.arc(3.5, y(0.33), 0.36, 0, Math.PI, true)
-  g.lineTo(1.23, y(0.3))
-  g.arc(0.87, y(0.33), 0.36, 0, Math.PI, true)
-  g.closePath()
-  g.fill()
-  // windows catching the street light
-  const glass = g.createLinearGradient(0, y(1.4), 0, y(1.0))
-  glass.addColorStop(0, '#2a3346')
-  glass.addColorStop(1, '#111620')
-  g.fillStyle = glass
-  g.beginPath()
-  g.moveTo(1.05, y(1.03))
-  g.quadraticCurveTo(1.4, y(1.36), 2.1, y(1.37))
-  g.quadraticCurveTo(2.75, y(1.36), 3.05, y(1.03))
-  g.closePath()
-  g.fill()
-  g.fillStyle = '#08090c'
-  g.fillRect(2.05, y(1.38), 0.08, 0.36)
-  // a line of light along the shoulder
-  g.strokeStyle = 'rgba(150,175,220,0.5)'
-  g.lineWidth = 0.02
-  g.beginPath()
-  g.moveTo(0.3, y(0.94))
-  g.quadraticCurveTo(2.2, y(0.98), 4.1, y(0.88))
-  g.stroke()
-  // wheels
-  for (const x of [0.87, 3.5]) {
-    g.fillStyle = '#050506'
-    g.beginPath()
-    g.arc(x, y(0.33), 0.33, 0, Math.PI * 2)
-    g.fill()
-    g.fillStyle = '#2d3037'
-    g.beginPath()
-    g.arc(x, y(0.33), 0.2, 0, Math.PI * 2)
-    g.fill()
-  }
-  // lamps: head at the front, tail at the back
-  g.fillStyle = '#fff6dc'
-  g.fillRect(4.2, y(0.78), 0.16, 0.08)
-  g.fillStyle = '#ff2020'
-  g.fillRect(0.04, y(0.8), 0.12, 0.09)
-}
-
 const rainVertex = /* glsl */ `
   attribute float tip;
   uniform float time;
@@ -1153,7 +1098,6 @@ function useArt(ready: boolean, lite: boolean) {
       pavement(g, 1024, 48, '#26242a', (x) => LIGHTS.reduce((s, [lx, , a, w]) => s + a * 0.35 * Math.exp(-(((x - lx) / (w * 0.7 + 0.4)) ** 2)), 0)),
     )
     const wires = texture(2048, Math.round(POLE_H * (2048 / WIDTH)), poles)
-    const body = texture(512, 168, silhouette)
     const head = radial('255,246,220')
     const tail = radial('255,40,30')
     // light pool a car's headlamps throw on the road ahead
@@ -1230,12 +1174,124 @@ function useArt(ready: boolean, lite: boolean) {
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     })
-    return { door, front, tarmac, near, far, wires, body, head, tail, pool, streak, spill, rainGeo, rain, ripples }
+    return { door, front, tarmac, near, far, wires, head, tail, pool, streak, spill, rainGeo, rain, ripples }
   }, [ready, lite])
 }
 
 const unlit = { toneMapped: false } as const
 const glowy = { toneMapped: false, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide } as const
+
+// The cars that drive past: the two models from the side bays, picked at random and in a
+// random colour each time. Lamp heights and half-widths are in metres.
+const MODELS = [
+  { file: 'impreza-sti.glb', length: 4.465, head: 0.66, tail: 0.86, side: 0.6 },
+  { file: 'mx5.glb', length: 3.915, head: 0.6, tail: 0.72, side: 0.6 },
+]
+const PAINTS = [
+  '#1c3f94', // WR blue
+  '#9b0d17', // deep red
+  '#efefea', // pearl white
+  '#0c0d0f', // black
+  '#b9bec4', // silver
+  '#e3ad00', // yellow
+  '#d4521c', // orange
+  '#123d2a', // racing green
+  '#3d2468', // midnight purple
+  '#4f565d', // gunmetal
+]
+type Traffic = { x: number; lane: number; model: number; colour: string; id: number; wait: number; live: boolean }
+type Art = NonNullable<ReturnType<typeof useArt>>
+
+function Cars({ a, traffic, wall }: { a: Art; traffic: React.RefObject<Traffic>; wall: number }) {
+  const sti = useGLTF(BASE + MODELS[0].file, false, true)
+  const mx5 = useGLTF(BASE + MODELS[1].file, false, true)
+  const cars = useMemo(
+    () =>
+      [sti.scene, mx5.scene].map((scene, i) => {
+        const d = dress(scene, MODELS[i].length)
+        // Out in the night street the garage's reflections should barely reach them.
+        d.car.traverse((o) => {
+          const m = (o as THREE.Mesh).material
+          for (const x of Array.isArray(m) ? m : m ? [m] : []) (x as THREE.MeshStandardMaterial).envMapIntensity = 0.35
+        })
+        d.car.visible = false
+        return d
+      }),
+    [sti.scene, mx5.scene],
+  )
+  const body = useRef<THREE.Group>(null)
+  const lights = useRef<THREE.Group>(null)
+  const parts = useRef<Record<string, THREE.Object3D | null>>({})
+  const last = useRef(-1)
+
+  useFrame(() => {
+    const tr = traffic.current
+    const p = parts.current
+    if (!body.current || !lights.current || !tr) return
+    body.current.visible = lights.current.visible = tr.live
+    if (!tr.live) return
+    const m = MODELS[tr.model]
+    const lane = LANES[tr.lane]
+    if (last.current !== tr.id) {
+      // a new car: show the right model, respray it, and put its lamps where its lamps are
+      last.current = tr.id
+      cars.forEach((c, i) => (c.car.visible = i === tr.model))
+      for (const paint of cars[tr.model].paints) paint.color.set(tr.colour)
+      const f = m.length / 2 - 0.1
+      p.headNear?.position.set(f, m.head - KERB, m.side + 0.15)
+      p.headFar?.position.set(f, m.head - KERB, -m.side)
+      p.tailNear?.position.set(-f, m.tail - KERB, m.side + 0.15)
+      p.tailFar?.position.set(-f, m.tail - KERB, -m.side)
+      p.pool?.position.setX(f + 3.2)
+      p.streakHead?.position.setX(f)
+      p.streakTail?.position.setX(-f)
+      // the models face +z: turn them to face the way they drive
+      body.current.rotation.y = (lane.dir * Math.PI) / 2
+      lights.current.scale.x = lane.dir
+    }
+    body.current.position.set(tr.x, -KERB, wall - lane.z)
+    lights.current.position.set(tr.x, 0, wall - lane.z)
+  })
+
+  const keep = (k: string) => (o: THREE.Object3D | null) => {
+    parts.current[k] = o
+  }
+  return (
+    <>
+      <group ref={body}>
+        {cars.map((c, i) => (
+          <primitive key={i} object={c.car} />
+        ))}
+      </group>
+      <group ref={lights} visible={false}>
+        <sprite ref={keep('headNear')} scale={[1.2, 1.2, 1]}>
+          <spriteMaterial map={a.head} {...glowy} />
+        </sprite>
+        <sprite ref={keep('headFar')} scale={[1.2, 1.2, 1]}>
+          <spriteMaterial map={a.head} {...glowy} />
+        </sprite>
+        <sprite ref={keep('tailNear')} scale={[0.6, 0.6, 1]}>
+          <spriteMaterial map={a.tail} {...glowy} />
+        </sprite>
+        <sprite ref={keep('tailFar')} scale={[0.6, 0.6, 1]}>
+          <spriteMaterial map={a.tail} {...glowy} />
+        </sprite>
+        <mesh ref={keep('pool')} rotation-x={-Math.PI / 2} position={[5.4, -KERB + 0.01, 0]}>
+          <planeGeometry args={[6.5, 2.6]} />
+          <meshBasicMaterial map={a.pool} opacity={0.55} {...glowy} />
+        </mesh>
+        <mesh ref={keep('streakHead')} rotation-x={-Math.PI / 2} position={[2.15, -KERB + 0.012, 1.4]}>
+          <planeGeometry args={[0.6, 2.6]} />
+          <meshBasicMaterial map={a.streak} opacity={0.5} color="#fff1d6" {...glowy} />
+        </mesh>
+        <mesh ref={keep('streakTail')} rotation-x={-Math.PI / 2} position={[-2.15, -KERB + 0.012, 1.4]}>
+          <planeGeometry args={[0.4, 2.2]} />
+          <meshBasicMaterial map={a.streak} opacity={0.45} color="#ff3020" {...glowy} />
+        </mesh>
+      </group>
+    </>
+  )
+}
 
 export function Street({ room }: { room: Room }) {
   const ready = useFonts()
@@ -1249,15 +1305,20 @@ export function Street({ room }: { room: Room }) {
   const spill = useRef<THREE.MeshBasicMaterial>(null)
   const sweep = useRef<THREE.MeshBasicMaterial>(null)
   const sweepMesh = useRef<THREE.Mesh>(null)
-  const car = useRef<THREE.Group>(null)
-  const traffic = useRef({ x: 0, lane: 0, wait: 1.5, live: false })
-  // ?car=x,lane holds a passing car in place (used for captures).
+  const traffic = useRef<Traffic>({ x: 0, lane: 0, model: 0, colour: PAINTS[0], id: 0, wait: 1.5, live: false })
+  // The passing cars are only loaded once the door has been opened.
+  const shutter = useStore((s) => s.shutter)
+  const [opened, setOpened] = useState(false)
+  useEffect(() => {
+    if (shutter) setOpened(true)
+  }, [shutter])
+  // ?car=x,lane,model,paint holds a passing car in place (used for captures).
   const pinned = useMemo(() => new URLSearchParams(location.search).get('car')?.split(',').map(Number), [])
   const down = useRef<[number, number]>([0, 0])
   const wall = -room.z
 
   useFrame((_, dt) => {
-    if (!a || !door.current || !bar.current || !street.current || !spill.current || !sweep.current || !sweepMesh.current || !car.current) return
+    if (!a || !door.current || !bar.current || !street.current || !spill.current || !sweep.current || !sweepMesh.current) return
     const s = useStore.getState()
     const st = k.current
     st.t = s.shutter ? Math.min(1, st.t + dt / OPEN_TIME) : Math.max(0, st.t - dt / OPEN_TIME)
@@ -1287,12 +1348,17 @@ export function Street({ room }: { room: Room }) {
 
     // Every so often a car goes by.
     const tr = traffic.current
-    if (pinned) Object.assign(tr, { live: true, x: pinned[0], lane: pinned[1] ? 1 : 0 })
-    else if (!tr.live) {
+    if (pinned) {
+      if (!tr.live) Object.assign(tr, { live: true, x: pinned[0], lane: pinned[1] ? 1 : 0, model: pinned[2] ? 1 : 0, colour: PAINTS[pinned[3] || 0], id: tr.id + 1 })
+    } else if (!tr.live) {
       tr.wait -= dt
       if (tr.wait <= 0) {
+        // a random car, in a random colour, in a random lane
         tr.live = true
+        tr.id++
         tr.lane = Math.random() < 0.5 ? 0 : 1
+        tr.model = Math.floor(Math.random() * MODELS.length)
+        tr.colour = PAINTS[Math.floor(Math.random() * PAINTS.length)]
         tr.x = -LANES[tr.lane].dir * (WIDTH / 2 + 4)
       }
     } else {
@@ -1301,12 +1367,6 @@ export function Street({ room }: { room: Room }) {
         tr.live = false
         tr.wait = 3 + Math.random() * 6
       }
-    }
-    car.current.visible = tr.live
-    if (tr.live) {
-      const lane = LANES[tr.lane]
-      car.current.position.set(tr.x, 0, wall - lane.z)
-      car.current.scale.x = lane.dir // the drawings face +x; mirror them for westbound cars
     }
     // ... and its headlamps sweep across the garage floor.
     const near = tr.live ? Math.exp(-(((tr.x + LANES[tr.lane].dir * 3) / 4) ** 2)) : 0
@@ -1418,31 +1478,11 @@ export function Street({ room }: { room: Room }) {
         </mesh>
         <lineSegments geometry={a.rainGeo} material={a.rain} position={[0, 0, wall]} frustumCulled={false} />
 
-        {/* the passing car: a dark shape behind its own lights */}
-        <group ref={car} visible={false}>
-          <mesh position={[0, -KERB + 0.725, 0]}>
-            <planeGeometry args={[4.4, 1.45]} />
-            <meshBasicMaterial map={a.body} transparent alphaTest={0.4} side={THREE.DoubleSide} {...unlit} />
-          </mesh>
-          <sprite position={[2.15, -KERB + 0.66, 0.3]} scale={[1.3, 1.3, 1]}>
-            <spriteMaterial map={a.head} {...glowy} />
-          </sprite>
-          <sprite position={[-2.15, -KERB + 0.66, 0.3]} scale={[0.7, 0.7, 1]}>
-            <spriteMaterial map={a.tail} {...glowy} />
-          </sprite>
-          <mesh rotation-x={-Math.PI / 2} position={[5.4, -KERB + 0.01, 0]}>
-            <planeGeometry args={[6.5, 2.6]} />
-            <meshBasicMaterial map={a.pool} opacity={0.55} {...glowy} />
-          </mesh>
-          <mesh rotation-x={-Math.PI / 2} position={[2.15, -KERB + 0.012, 1.4]}>
-            <planeGeometry args={[0.6, 2.6]} />
-            <meshBasicMaterial map={a.streak} opacity={0.5} color="#fff1d6" {...glowy} />
-          </mesh>
-          <mesh rotation-x={-Math.PI / 2} position={[-2.15, -KERB + 0.012, 1.4]}>
-            <planeGeometry args={[0.4, 2.2]} />
-            <meshBasicMaterial map={a.streak} opacity={0.45} color="#ff3020" {...glowy} />
-          </mesh>
-        </group>
+        {opened && (
+          <Suspense fallback={null}>
+            <Cars a={a} traffic={traffic} wall={wall} />
+          </Suspense>
+        )}
       </group>
     </>
   )
