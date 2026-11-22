@@ -44,6 +44,7 @@ All text is in `public/content.json`, fetched when the page opens. Two ways to e
 - `src/scene/Garage.tsx` — the room, its lights and the timing of the opening sequence.
 - `src/scene/Props.tsx` — garage furniture (tool chest, workbench, racks, drums).
 - `src/scene/Jdm.tsx` — the Japanese tuner-garage set: two-post lifts, wheel wall, vending machine, neon sign, posters. All artwork is drawn in code.
+- `src/scene/Street.tsx` — the roller shutter in the back wall (mural of the Mazda doing a burnout) and the rainy night street it rolls up onto: shop fronts, wet road, rain, passing cars, a synthesised motor-and-rattle sound. Click the door to open or close it. Add `?car=x,lane` to hold a passing car in place for captures.
 - `src/assets/garage-jp.woff2` — a small subset of Noto Sans JP Black (SIL Open Font License 1.1) for the Japanese lettering.
 - `src/scene/Scene.tsx` — camera views per tab, opening-sequence clock, ground shadow.
 - `src/ui/` — headline, tabs, content panel, adjust popover.

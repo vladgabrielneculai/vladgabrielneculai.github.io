@@ -493,9 +493,12 @@ export function Car() {
     // Negative camber: the top of each wheel leans in towards the body.
     for (const w of r.wheels) w.pivot.rotation.z = w.side * a.camber
 
-    easing.damp(a, 'lights', s.lights ? 1 : 0, 0.12, dt)
+    // A double flash of the headlamps (the garage door has just opened onto the street).
+    const since = (performance.now() - s.flash) / 1000
+    const blink = s.flash > 0 && (since < 0.13 || (since > 0.3 && since < 0.43))
+    easing.damp(a, 'lights', blink ? 1.7 : s.lights ? 1 : 0, blink ? 0.02 : 0.12, dt)
     if (r.lampMat) r.lampMat.emissiveIntensity = a.lights * 3.4
-    for (const f of r.flares) f.opacity = a.lights
+    for (const f of r.flares) f.opacity = Math.min(1, a.lights)
     for (const b of r.beams) b.intensity = a.lights * 42
   })
 

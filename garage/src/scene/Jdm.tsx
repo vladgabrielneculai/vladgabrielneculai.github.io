@@ -9,14 +9,14 @@ import { LIFT_UP } from './Display'
 type V3 = [number, number, number]
 type G = CanvasRenderingContext2D
 
-const JP = 'GarageJP' // Noto Sans JP Black, cut down to the glyphs used below
-const LATIN = '"Manrope Variable", system-ui, sans-serif'
-const RED = '#b1121d'
+export const JP = 'GarageJP' // Noto Sans JP Black, cut down to the glyphs used here and in Street.tsx
+export const LATIN = '"Manrope Variable", system-ui, sans-serif'
+export const RED = '#b1121d'
 
 // Wheel wall on the right-hand side: Car.tsx hangs copies of the car's own wheels here.
 export const WHEEL_WALL = { z0: -9.6, dz: 0.78, count: 5, rails: [0.5, 1.36], inset: 0.17 }
 
-function texture(w: number, h: number, draw: (g: G) => void) {
+export function texture(w: number, h: number, draw: (g: G) => void) {
   const c = document.createElement('canvas')
   c.width = w
   c.height = h
@@ -27,7 +27,7 @@ function texture(w: number, h: number, draw: (g: G) => void) {
   return t
 }
 
-const text = (g: G, s: string, x: number, y: number, font: string, fill: string, align: CanvasTextAlign = 'center') => {
+export const text = (g: G, s: string, x: number, y: number, font: string, fill: string, align: CanvasTextAlign = 'center') => {
   g.font = font
   g.fillStyle = fill
   g.textAlign = align
@@ -472,15 +472,22 @@ function WheelRails({ a, x }: { a: Art; x: number }) {
   )
 }
 
-export function Jdm({ room }: { room: { x: number; z: number; h: number } }) {
-  // The signs need their fonts before they can be drawn.
+// The signs need their fonts before they can be drawn. Loaded once, shared by every user.
+let fonts: Promise<unknown> | null = null
+export function useFonts() {
   const [ready, setReady] = useState(false)
   useEffect(() => {
-    const face = new FontFace(JP, `url(${jpFont})`)
-    Promise.all([face.load().then((f) => document.fonts.add(f)), document.fonts.load(`800 40px ${LATIN}`)])
-      .catch(() => undefined)
-      .then(() => setReady(true))
+    fonts ??= Promise.all([
+      new FontFace(JP, `url(${jpFont})`).load().then((f) => document.fonts.add(f)),
+      document.fonts.load(`800 40px ${LATIN}`),
+    ]).catch(() => undefined)
+    fonts.then(() => setReady(true))
   }, [])
+  return ready
+}
+
+export function Jdm({ room }: { room: { x: number; z: number; h: number } }) {
+  const ready = useFonts()
   const a = useArt(ready)
   if (!a) return null
   const back = -room.z + 0.02

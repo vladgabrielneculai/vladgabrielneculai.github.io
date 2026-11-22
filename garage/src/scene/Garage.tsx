@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import { intro, useStore } from '../store'
 import { Jdm } from './Jdm'
 import { Props } from './Props'
+import { OPENING, Street } from './Street'
 
 export const ROOM = { x: 12, z: 13, h: 4.2 }
 const BARS = [-8, -4, 0, 4, 8] // ceiling light strips, back to front
@@ -70,26 +71,7 @@ function useTextures() {
         },
         [repeat, 1],
       )
-    // Sectional garage door: four ribbed panels.
-    const door = tex(512, 512, (g) => {
-      g.fillStyle = '#d4d6d8'
-      g.fillRect(0, 0, 512, 512)
-      for (let p = 0; p < 4; p++) {
-        for (let r = 0; r < 4; r++) {
-          const y = p * 128 + r * 32
-          const grad = g.createLinearGradient(0, y, 0, y + 32)
-          grad.addColorStop(0, 'rgba(255,255,255,0.35)')
-          grad.addColorStop(0.75, 'rgba(0,0,0,0.05)')
-          grad.addColorStop(1, 'rgba(0,0,0,0.28)')
-          g.fillStyle = grad
-          g.fillRect(0, y, 512, 32)
-        }
-        g.fillStyle = 'rgba(0,0,0,0.5)'
-        g.fillRect(0, p * 128 + 125, 512, 3)
-      }
-      grain(g, 512, 512, 5000, 0.04)
-    })
-    return { side: wall(6), end: wall(5.5), door }
+    return { side: wall(6), end: wall(5.5) }
   }, [])
 }
 
@@ -118,8 +100,33 @@ function Bar({ i, z }: { i: number; z: number }) {
   )
 }
 
+// Back wall with the door opening cut out: three panels around the hole, with the UVs the
+// whole wall would have so the paint lines up.
+function wallWithOpening() {
+  const W = ROOM.x * 2
+  const panels = [
+    [-ROOM.x, -OPENING.w / 2, 0, ROOM.h],
+    [OPENING.w / 2, ROOM.x, 0, ROOM.h],
+    [-OPENING.w / 2, OPENING.w / 2, OPENING.h, ROOM.h],
+  ]
+  const pos: number[] = []
+  const uv: number[] = []
+  for (const [x0, x1, y0, y1] of panels) {
+    for (const [x, y] of [[x0, y0], [x1, y0], [x1, y1], [x0, y0], [x1, y1], [x0, y1]]) {
+      pos.push(x, y, 0)
+      uv.push((x + ROOM.x) / W, y / ROOM.h)
+    }
+  }
+  const g = new THREE.BufferGeometry()
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3))
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2))
+  g.computeVertexNormals()
+  return g
+}
+
 export function Garage() {
   const t = useTextures()
+  const backWall = useMemo(wallWithOpening, [])
   const lite = useStore((s) => s.lite)
   useFrame(({ scene }) => {
     // The image-based light follows the strips as they come on.
@@ -180,8 +187,7 @@ export function Garage() {
       ))}
 
       {/* Walls and ceiling */}
-      <mesh position={[0, ROOM.h / 2, -ROOM.z]}>
-        <planeGeometry args={[ROOM.x * 2, ROOM.h]} />
+      <mesh position={[0, 0, -ROOM.z]} geometry={backWall}>
         <meshStandardMaterial map={t.end} roughness={0.9} />
       </mesh>
       <mesh position={[0, ROOM.h / 2, ROOM.z]} rotation-y={Math.PI}>
@@ -204,23 +210,8 @@ export function Garage() {
         <Bar key={z} i={i} z={z} />
       ))}
 
-      {/* Garage door behind the car */}
-      <group position={[0, 0, -ROOM.z + 0.05]}>
-        <mesh position={[0, 1.6, 0]}>
-          <planeGeometry args={[6.4, 3.2]} />
-          <meshStandardMaterial map={t.door} roughness={0.5} metalness={0.3} />
-        </mesh>
-        {[
-          [-3.3, 1.65, 0.2, 3.3],
-          [3.3, 1.65, 0.2, 3.3],
-          [0, 3.3, 6.8, 0.2],
-        ].map(([x, y, w, h], i) => (
-          <mesh key={i} position={[x, y, 0.03]}>
-            <boxGeometry args={[w, h, 0.1]} />
-            <meshStandardMaterial color="#2b2d30" roughness={0.6} />
-          </mesh>
-        ))}
-      </group>
+      {/* Roller shutter in the back wall, and the street behind it */}
+      <Street room={ROOM} />
 
       <Props room={ROOM} />
       <Jdm room={ROOM} />
