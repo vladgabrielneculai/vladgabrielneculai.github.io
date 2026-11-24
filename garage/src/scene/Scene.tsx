@@ -5,6 +5,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import type { OrbitControls as Controls } from 'three-stdlib'
 import type { Tab } from '../data'
+import { drive, driving } from '../drive'
 import { INTRO_END, intro, useStore } from '../store'
 import { Car } from './Car'
 import { BAYS, Display } from './Display'
@@ -69,11 +70,20 @@ function GroundShadow() {
     for (const [x, y] of [[57, 136], [199, 136], [59, 387], [197, 387]]) blob(x, y, 30, 42, 0.6)
     return new THREE.CanvasTexture(c)
   }, [])
+  // it goes where the car goes
+  const follow = useRef<THREE.Group>(null)
+  useFrame(() => {
+    if (!follow.current) return
+    follow.current.position.set(drive.x, drive.y, drive.z)
+    follow.current.rotation.y = drive.yaw
+  })
   return (
-    <mesh rotation-x={-Math.PI / 2} position={[0, 0.006, 0]} scale={[2.9, 5.6, 1]} renderOrder={1}>
-      <planeGeometry />
-      <meshBasicMaterial map={tex} transparent depthWrite={false} toneMapped={false} />
-    </mesh>
+    <group ref={follow}>
+      <mesh rotation-x={-Math.PI / 2} position={[0, 0.006, 0]} scale={[2.9, 5.6, 1]} renderOrder={1}>
+        <planeGeometry />
+        <meshBasicMaterial map={tex} transparent depthWrite={false} toneMapped={false} />
+      </mesh>
+    </group>
   )
 }
 
@@ -83,6 +93,9 @@ const HEAD = new THREE.Vector3(0.37, 1.15, -0.3)
 const AHEAD = new THREE.Vector3(0.3, 0.97, 1.4)
 const DOORWAY = new THREE.Vector3(2.4, 1.3, -0.55)
 const REACH = 0.15
+// Where the camera watches a drive out from.
+const DIRECTOR = new THREE.Vector3(1.8, 2.3, 8.6)
+const DIRECTOR_PHONE = new THREE.Vector3(1.2, 2.8, 11)
 
 function Rig() {
   const { camera, size } = useThree()
@@ -95,6 +108,9 @@ function Rig() {
   const leaving = useRef(false) // getting out through the driver's door
   const wasInside = useRef(false)
   const sheet = useStore((s) => s.sheet)
+  // Bumped when the car is back from a drive, to set the camera off for the current tab again.
+  const [lap, setLap] = useState(0)
+  const wasDriving = useRef(false)
   const off = useRef({ x: 0, y: 0 })
   const sph = useMemo(() => new THREE.Spherical(), [])
   const rel = useMemo(() => new THREE.Vector3(), [])
@@ -138,7 +154,7 @@ function Rig() {
     }
     wasInside.current = inside
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab])
+  }, [tab, lap])
   useEffect(() => {
     if (!inside) moving.current = true
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -199,6 +215,22 @@ function Rig() {
     easing.damp(off.current, 'y', portrait ? size.height * (!lifted ? 0.14 : inside ? 0.3 : 0.27) : 0, 0.3, dt)
     cam.fov = portrait ? 50 : inside ? 42 : 30
     cam.setViewOffset(size.width, size.height, off.current.x, off.current.y, size.width, size.height)
+
+    // While the car is on the move, the camera stands inside the garage and watches it go
+    // out through the door (or come back in).
+    if (driving()) {
+      wasDriving.current = true
+      if (controls.current) controls.current.enabled = false
+      easing.damp3(cam.position, portrait ? DIRECTOR_PHONE : DIRECTOR, 0.6, dt)
+      rel.set(THREE.MathUtils.clamp(drive.x * 0.75, -6, 6), 0.9, Math.min(-2, drive.z - 1.5))
+      easing.damp3(look, rel, 0.45, dt)
+      cam.lookAt(look)
+      return
+    }
+    if (wasDriving.current) {
+      wasDriving.current = false
+      setLap((l) => l + 1)
+    }
 
     const c = controls.current
     if (!moving.current) {
@@ -289,7 +321,7 @@ export function Scene() {
       // (Taps that land on the car itself never reach this.)
       onPointerMissed={() => {
         const s = useStore.getState()
-        if (s.tab === 'about' && s.open.doorFL) s.set({ tab: 'home' })
+        if (s.tab === 'about' && s.open.doorFL && drive.phase === 'home') s.set({ tab: 'home' })
       }}
       dpr={dpr} gl={{ antialias: true, powerPreference: 'high-performance', toneMappingExposure: 0.82 }} camera={{ fov: 30, near: 0.04, far: 80, position: [0.6, 0.5, 11.2] }}>
       {/* Too slow: first render fewer pixels, then give up the mirrored floor. It never steps back

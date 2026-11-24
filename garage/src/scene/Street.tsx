@@ -5,6 +5,7 @@ import { useGLTF } from '@react-three/drei'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
+import { drive } from '../drive'
 import { makeEngine, rain, rattle, type Engine } from '../sound'
 import { useStore } from '../store'
 import { BASE, dress } from './Display'
@@ -1282,6 +1283,7 @@ export function Street({ room }: { room: Room }) {
       st.flashed = true
       s.set({ flash: performance.now() })
     }
+    if ((st.t === 1) !== s.doorUp) s.set({ doorUp: st.t === 1 })
     const up = st.t * st.t * (3 - 2 * st.t) // eases in and out like a motor starting and stopping
     const left = Math.max(0.0001, 1 - up)
     door.current.scale.y = left
@@ -1308,7 +1310,8 @@ export function Street({ room }: { room: Room }) {
     if (pinned) {
       if (!tr.live) Object.assign(tr, { live: true, x: pinned[0], lane: pinned[1] ? 1 : 0, model: pinned[2] ? 1 : 0, colour: PAINTS[pinned[3] || 0], id: tr.id + 1 })
     } else if (!tr.live) {
-      tr.wait -= dt
+      // no traffic while the Mazda is out on the street
+      if (drive.phase === 'home') tr.wait -= dt
       if (tr.wait <= 0) {
         // a random car, in a random colour, in a random lane
         tr.live = true
@@ -1325,6 +1328,7 @@ export function Street({ room }: { room: Room }) {
         tr.wait = 3 + Math.random() * 6
       }
     }
+    drive.street = tr.live
     // ... and its headlamps sweep across the garage floor.
     const near = tr.live ? Math.exp(-(((tr.x + LANES[tr.lane].dir * 3) / 4) ** 2)) : 0
     sweep.current.opacity = up * near * 0.4
@@ -1340,9 +1344,10 @@ export function Street({ room }: { room: Room }) {
     const s = useStore.getState()
     // From the driver's seat, a tap out here means "get out", as anywhere else outside the car.
     if (s.tab === 'about') {
-      if (s.open.doorFL) s.set({ tab: 'home' })
+      if (s.open.doorFL && drive.phase === 'home') s.set({ tab: 'home' })
       return
     }
+    if (drive.phase !== 'home') return // the door stays up while the car is out
     s.set({ shutter: !s.shutter })
     rattle(OPEN_TIME)
   }

@@ -32,6 +32,8 @@ type State = {
   engine: boolean // the Mazda's engine is running
   rev: boolean // throttle held down
   sound: boolean // all sound on or muted
+  doorUp: boolean // the shutter is all the way up
+  out: boolean // the Mazda has gone out for a drive (see drive.ts)
   set: (p: Partial<State>) => void
   toggle: (part: Part) => void
 }
@@ -64,6 +66,8 @@ export const useStore = create<State>((set) => ({
   engine: false,
   rev: false,
   sound: true,
+  doorUp: false,
+  out: false,
   set: (p) => set(p),
   // Clicking a panel opens it and jumps to its tab; clicking again closes it.
   toggle: (part) => set((s) => (s.open[part] ? { open: { ...s.open, [part]: false } } : { open: { ...s.open, [part]: true }, tab: zones[part].tab ?? s.tab })),

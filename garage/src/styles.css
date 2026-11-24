@@ -122,6 +122,44 @@ button {
 
 /* Section navigation. Phones: a full-width bar of five icons (Home is the name at the top
    left, or closing the sheet). Desktop: a floating pill of text tabs. */
+/* "Drive into the city": over the tab bar while the garage door is up */
+.city {
+  position: fixed;
+  z-index: 36;
+  left: 50%;
+  bottom: calc(4.4rem + env(safe-area-inset-bottom));
+  translate: -50% 0;
+  padding: 0.7rem 1.4rem;
+  line-height: 1.25;
+  text-align: center;
+  color: #fff;
+  background: var(--color-accent);
+  border-radius: 999px;
+  box-shadow: 0 12px 30px rgb(177 18 29 / 0.35);
+  transition:
+    opacity 0.3s,
+    translate 0.3s;
+}
+.city:hover {
+  filter: brightness(1.08);
+}
+.city-off {
+  opacity: 0;
+  translate: -50% 0.75rem;
+  pointer-events: none;
+}
+/* phones: the content sheet already fills the bottom of the screen */
+@media (max-width: 767.98px) {
+  .city-panel {
+    display: none;
+  }
+}
+@media (min-width: 768px) {
+  .city {
+    bottom: 5.6rem;
+  }
+}
+
 .tabs {
   position: fixed;
   z-index: 40;

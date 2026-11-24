@@ -3,6 +3,7 @@ import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { easing } from 'maath'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { drive, step } from '../drive'
 import { makeEngine, type Engine } from '../sound'
 import { useStore, zones, type Part, type Zone } from '../store'
 import { ROOM } from './Garage'
@@ -416,23 +417,35 @@ function rig(scene: THREE.Object3D) {
   const wheelsRoot = new THREE.Group()
   const tyres = named('polySurface').filter((m) => matName(m).includes('Tyre'))
   const extras = [...named('WorkEmotion_Rim'), ...meshes.filter((m) => m.material === discMat || m.material === caliper)]
+  // The pivot steers and cambers; inside it the tyre, rim and disc turn on the axle, while the
+  // caliper stays put on the pivot.
+  const taken = new Set<THREE.Object3D>()
   const wheels = tyres.map((t) => {
     const centre = c([t])
     const p = new THREE.Group()
     p.name = 'wheel'
     p.position.copy(centre)
+    p.rotation.order = 'YZX' // steer, then camber
+    const spin = new THREE.Group()
+    p.add(spin)
     wheelsRoot.add(p)
     p.updateMatrixWorld(true)
-    p.attach(t)
-    extras.filter((e) => e.parent !== p && c([e]).distanceTo(centre) < 0.45).forEach((e) => p.attach(e))
-    return { pivot: p, side: Math.sign(centre.x) }
+    spin.attach(t)
+    for (const e of extras.filter((e) => !taken.has(e) && c([e]).distanceTo(centre) < 0.45)) {
+      taken.add(e)
+      ;((e as THREE.Mesh).material === caliper ? p : spin).attach(e)
+    }
+    return { pivot: p, spin, side: Math.sign(centre.x), front: centre.z > 0 }
   })
 
   // A spare wheel for the garage: one of the car's own, without its brake.
   const spare = wheels[0].pivot.clone(true)
   spare.name = 'spare'
   spare.position.set(0, 0, 0)
-  spare.children.filter((o) => (o as THREE.Mesh).material === discMat || (o as THREE.Mesh).material === caliper).forEach((o) => spare.remove(o))
+  spare.rotation.order = 'XYZ' // the spares are posed with plain rotations
+  const brakes: THREE.Object3D[] = []
+  spare.traverse((o) => ((o as THREE.Mesh).material === discMat || (o as THREE.Mesh).material === caliper) && brakes.push(o))
+  brakes.forEach((o) => o.removeFromParent())
   const tyreRadius = boxOf([tyres[0]]).getSize(new THREE.Vector3()).y / 2
   const tyreWidth = boxOf([tyres[0]]).getSize(new THREE.Vector3()).x
 
@@ -480,14 +493,25 @@ export function Car() {
   const eng = useRef({ on: false, t0: 0, rpm: 0, prev: 0, throttle: 0, roll: 0, pitch: 0, voice: null as Engine | null })
   useEffect(() => () => eng.current.voice?.stop(), [])
   const down = useRef<[number, number]>([0, 0])
+  const mover = useRef<THREE.Group>(null)
 
   useEffect(() => {
     useStore.getState().set({ ready: true })
   }, [])
 
-  useFrame((_, dt) => {
+  useFrame(({ camera }, dt) => {
     const s = useStore.getState()
     const a = v.current
+    // Out for a drive: place the car, turn the wheels, steer the fronts.
+    step(dt)
+    if (mover.current) {
+      mover.current.position.set(drive.x, drive.y, drive.z)
+      mover.current.rotation.y = drive.yaw
+    }
+    for (const w of r.wheels) {
+      w.spin.rotation.x = drive.roll / r.tyreRadius
+      w.pivot.rotation.y = w.front ? drive.steer : 0
+    }
     for (const part of Object.keys(OPEN) as Part[]) {
       const p = r.pivots[part]
       const { axis, angle } = OPEN[part]
@@ -510,13 +534,18 @@ export function Car() {
     if (e.on) e.voice ??= makeEngine()
     const running = now - e.t0
     const cranking = e.on && running < CRANK
-    const target = !e.on ? 0 : cranking ? 230 : running < CRANK + 0.5 ? 1600 : s.rev ? 6900 : IDLE
+    // under way, the revs follow the road speed and the pull
+    const cruise = IDLE + Math.abs(drive.speed) * 330 + Math.max(0, Math.abs(drive.speed) > 0.2 ? drive.accel * Math.sign(drive.speed) : 0) * 420
+    const target = !e.on ? 0 : cranking ? 230 : running < CRANK + 0.5 ? 1600 : s.rev ? 6900 : Math.min(5200, cruise)
     const rate = target > e.rpm ? (s.rev ? 6500 : 5000) : e.on ? 2600 : 1400
     e.prev = e.rpm
     e.rpm = target > e.rpm ? Math.min(target, e.rpm + rate * dt) : Math.max(target, e.rpm - rate * dt)
     if (s.rev && e.rpm >= 6850) e.rpm = 6350 // bouncing off the limiter
-    easing.damp(e, 'throttle', e.on && !cranking && (s.rev || running < CRANK + 0.35) ? 1 : 0, 0.05, dt)
-    e.voice?.set(e.rpm, e.throttle, cranking ? 0.45 : 1)
+    const pulling = Math.abs(drive.speed) > 0.2 && drive.accel * Math.sign(drive.speed) > 0.3
+    easing.damp(e, 'throttle', e.on && !cranking && (s.rev || running < CRANK + 0.5 || pulling) ? 1 : 0, 0.05, dt)
+    // quieter as it drives off down the street, panned to where it is
+    const far = Math.max(0, camera.position.distanceTo(mover.current?.position ?? camera.position) - 9)
+    e.voice?.set(e.rpm, e.throttle, (cranking ? 0.45 : 1) / (1 + far / 7) ** 2, drive.x / 12)
 
     const load = e.on && !cranking ? Math.min(1, Math.max(0, (e.rpm - IDLE) / 6000)) : 0
     const torque = THREE.MathUtils.clamp((e.rpm - e.prev) / Math.max(dt, 1e-3) / 25000, -1, 1)
@@ -550,6 +579,7 @@ export function Car() {
   // A click only counts if the pointer did not travel: dragging turns the car instead.
   const onDown = (e: ThreeEvent<PointerEvent>) => (down.current = [e.clientX, e.clientY])
   const onClick = (e: ThreeEvent<MouseEvent>) => {
+    if (drive.phase !== 'home') return
     const zone = zoneOf(e.object)
     if (Math.hypot(e.clientX - down.current[0], e.clientY - down.current[1]) > 6) return
     const st = useStore.getState()
@@ -567,8 +597,10 @@ export function Car() {
 
   return (
     <group onPointerMove={onMove} onPointerOut={onOut} onPointerDown={onDown} onClick={onClick}>
-      <primitive object={r.car} />
-      <primitive object={r.wheelsRoot} />
+      <group ref={mover}>
+        <primitive object={r.car} />
+        <primitive object={r.wheelsRoot} />
+      </group>
       <SpareWheels wheel={r.spare} radius={r.tyreRadius} width={r.tyreWidth} />
     </group>
   )

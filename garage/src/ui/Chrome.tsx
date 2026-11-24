@@ -1,5 +1,6 @@
 import { useProgress } from '@react-three/drei'
 import { profile, tabs } from '../data'
+import { leave } from '../drive'
 import { starter, unlock } from '../sound'
 import { useStore } from '../store'
 
@@ -38,6 +39,28 @@ function Switch({ label, on, toggle, last }: { label: string; on: boolean; toggl
       <span className={`relative h-5 w-9 rounded-full transition-colors ${on ? 'bg-accent' : 'bg-ink/15'}`}>
         <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${on ? 'left-[1.1rem]' : 'left-0.5'}`} />
       </span>
+    </button>
+  )
+}
+
+// Once the garage door is up: take the car out into the city, which ends at Contact.
+function City() {
+  const doorUp = useStore((s) => s.doorUp)
+  const out = useStore((s) => s.out)
+  const tab = useStore((s) => s.tab)
+  const show = doorUp && !out && tab !== 'about'
+  return (
+    <button
+      aria-hidden={!show}
+      inert={!show}
+      className={`city ${show ? '' : 'city-off'} ${tab === 'home' ? '' : 'city-panel'}`}
+      onClick={() => {
+        unlock()
+        leave()
+      }}
+    >
+      <span className="block text-[15px] font-extrabold">Drive into the city →</span>
+      <span className="block text-xs font-semibold text-white/75">and get in touch with me</span>
     </button>
   )
 }
@@ -148,6 +171,7 @@ export function Chrome({ webgl }: { webgl: boolean }) {
       </nav>
 
       {webgl && <Adjust />}
+      {webgl && <City />}
     </>
   )
 }
