@@ -1421,6 +1421,7 @@ export function Street({ room }: { room: Room }) {
   const spill = useRef<THREE.MeshBasicMaterial>(null)
   const sweep = useRef<THREE.MeshBasicMaterial>(null)
   const sweepMesh = useRef<THREE.Mesh>(null)
+  const wires = useRef<THREE.Mesh>(null)
   const traffic = useRef<Traffic>({ x: 0, lane: 0, model: 0, colour: PAINTS[0], id: 0, wait: 1.5, live: false })
   // (The passing cars load with the parked ones, the same two models; they only drive by
   // while the door is open, since the street is only updated then.)
@@ -1461,6 +1462,7 @@ export function Street({ room }: { room: Room }) {
     const time = performance.now() / 1000
     a.rain.uniforms.time.value = time
     a.ripples.uniforms.time.value = time
+    if (wires.current) wires.current.visible = !drive.closeUp
     const fall = s.weather === 'snow' || s.weather === 'sakura' ? FALL[s.weather] : null
     if (fall) {
       const u = a.flakes.uniforms
@@ -1600,7 +1602,8 @@ export function Street({ room }: { room: Room }) {
           <planeGeometry args={[WIDTH, KERB]} />
           <meshBasicMaterial color="#3a3c41" {...unlit} />
         </mesh>
-        <mesh position={[0, POLE_H / 2, wall - NEAR + 0.05]}>
+        {/* (a flat painting: hidden while the phone camera stands right in front of it) */}
+        <mesh ref={wires} position={[0, POLE_H / 2, wall - NEAR + 0.05]}>
           <planeGeometry args={[WIDTH, POLE_H]} />
           <meshBasicMaterial map={a.wires} transparent alphaTest={0.02} depthWrite={false} {...unlit} />
         </mesh>

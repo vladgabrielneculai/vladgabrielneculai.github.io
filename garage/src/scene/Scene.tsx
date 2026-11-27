@@ -160,10 +160,39 @@ const REACH = 0.15
 // The rail the camera rides while the car drives out: low in front of it, then towards the
 // door. Phones stand further back to fit the narrow screen.
 const RAIL = new THREE.CatmullRomCurve3([new THREE.Vector3(2.4, 1.05, 6.6), new THREE.Vector3(2.1, 1.2, 1.5), new THREE.Vector3(1.8, 1.3, -3.5), new THREE.Vector3(1.2, 1.45, -8)])
-const RAIL_PHONE = new THREE.CatmullRomCurve3([new THREE.Vector3(2.2, 1.4, 10.5), new THREE.Vector3(1.9, 1.5, 4.5), new THREE.Vector3(1.6, 1.6, -1), new THREE.Vector3(1.1, 1.7, -6)])
+// Phones held upright get their own cut, framed for a tall screen: a car seen nose-on is
+// narrow and tall, so the camera keeps to the car's ends. It rides just ahead of the nose as
+// the car backs out; holds in the doorway while it swings round; waits on the pavement while
+// it pulls away and drives straight past; watches it come back head-on from in front of the
+// door; and backs into the garage ahead of it as it parks. (Each move between these stays
+// clear of the door's jambs.)
+const HELD = typeof location !== 'undefined' && new URLSearchParams(location.search).has('drive')
+const NOSE = 7 // metres ahead of the car's origin (about 4.8 m ahead of the bumper)
+const DOORWAY_IN = new THREE.Vector3(0.3, 1.25, -11.4)
+const PAVEMENT = new THREE.Vector3(-3, 1.05, -13.35) // on the pavement west of the door, 1.2 m clear of the passing car
+const FRONT = new THREE.Vector3(-1, 1, -13.7) // on the pavement in front of the door
+const INSIDE = new THREE.Vector3(-1.5, 1.2, -7.5)
+const TURN = 9.5 // metres along the path where the car starts to swing round
+function phoneShot(out: THREE.Vector3) {
+  const ahead = () => out.set(drive.x + Math.sin(drive.yaw) * NOSE + Math.cos(drive.yaw) * 0.6, 1.05 + drive.y, drive.z + Math.cos(drive.yaw) * NOSE - Math.sin(drive.yaw) * 0.6)
+  switch (drive.phase) {
+    case 'reverse':
+      return drive.s < TURN ? ahead() : out.copy(DOORWAY_IN)
+    case 'shift':
+    case 'drive':
+    case 'away':
+      return out.copy(PAVEMENT)
+    case 'arrive':
+      return out.copy(FRONT)
+    case 'park':
+      return drive.s > TURN + 2.5 ? out.copy(INSIDE) : ahead()
+    default:
+      return ahead() // starting up, or waiting for traffic
+  }
+}
 
 function Rig() {
-  const { camera, size } = useThree()
+  const { camera, size, scene } = useThree()
   const cam = camera as THREE.PerspectiveCamera
   const tab = useStore((s) => s.tab)
   const ready = useStore((s) => s.ready)
@@ -283,7 +312,7 @@ function Rig() {
     const lifted = panel && sheet !== 'peek'
     easing.damp(off.current, 'y', portrait && !cinema && !story ? size.height * (!lifted ? 0.14 : inside ? 0.3 : 0.27) : 0, 0.3, dt)
     // the phone stage is about square: a wider lens keeps the whole car in it
-    cam.fov = portrait ? 50 : story ? (inside ? 58 : 40) : inside ? 42 : 30
+    cam.fov = portrait ? (cinema ? 55 : 50) : story ? (inside ? 58 : 40) : inside ? 42 : 30
     cam.setViewOffset(size.width, size.height, off.current.x, off.current.y, size.width, size.height)
 
     // While the car is on the move, the camera stands inside the garage and watches it go
@@ -294,13 +323,27 @@ function Rig() {
       // The camera glides along a rail from in front of the car towards the door as the car
       // goes, keeping it in frame; once it is out on the street, the camera watches through
       // the doorway.
-      const step = Math.min(dt, 1 / 20)
-      easing.damp3(cam.position, (portrait ? RAIL_PHONE : RAIL).getPoint(drive.cam, rel), 0.55, step)
-      rel.set(THREE.MathUtils.clamp(drive.x, -4.2, 4.2), 0.75 + drive.y, Math.max(drive.z, -16))
-      easing.damp3(look, rel, 0.3, step)
+      // (a drive held for a capture cuts straight to its shot)
+      const step = HELD ? 10 : Math.min(dt, 1 / 20)
+      if (portrait) {
+        easing.damp3(cam.position, phoneShot(rel), 0.6, step)
+        rel.set(drive.x, 0.7 + drive.y, drive.z)
+        easing.damp3(look, rel, 0.22, step)
+      } else {
+        easing.damp3(cam.position, RAIL.getPoint(drive.cam, rel), 0.55, step)
+        rel.set(THREE.MathUtils.clamp(drive.x, -4.2, 4.2), 0.75 + drive.y, Math.max(drive.z, -16))
+        easing.damp3(look, rel, 0.3, step)
+      }
       cam.lookAt(look)
+      drive.closeUp = portrait && drive.s > TURN
+      // out on the street the painted street's far ends would show: a night mist hides them
+      const fog = scene.fog as THREE.FogExp2 | null
+      if (fog) easing.damp(fog, 'density', portrait && drive.s > TURN ? 0.075 : 0, 0.8, step)
       return
     }
+    const fog = scene.fog as THREE.FogExp2 | null
+    if (fog && fog.density > 0) fog.density = Math.max(0, fog.density - dt * 0.2)
+    drive.closeUp = false
     if (wasDriving.current) {
       wasDriving.current = false
       setLap((l) => l + 1)
@@ -427,6 +470,8 @@ export function Scene() {
           <Warmup />
         </Suspense>
       </Tilt>
+      {/* always there, so every shader is compiled with it once; thin as nothing until needed */}
+      <fogExp2 attach="fog" args={['#070809', 0]} />
       <Rig />
     </Canvas>
   )

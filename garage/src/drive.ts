@@ -102,10 +102,12 @@ export const drive = {
   accel: 0,
   roll: 0, // metres rolled, for turning the wheels
   cam: 0, // 0..1: where along its rail the camera watching the drive should be
+  s: 0, // metres along the reverse manoeuvre's path (its full length once out on the street)
   started: false, // the engine was off and the drive started it
   instant: false, // reduced motion: no drive, just the form
   faded: false, // this drive has already faded to black and opened the form
   street: false, // set by the street while a passing car goes by
+  closeUp: false, // set by the camera while it films the drive from out on the pavement (phones)
 }
 
 // The car is on the move (or about to be): not parked, and not away behind the black screen.
@@ -118,6 +120,7 @@ function onPath(s: number) {
   drive.z = p.z + Math.cos(p.yaw) * REAR
   drive.yaw = p.yaw
   drive.k = p.k
+  drive.s = s
 }
 onPath(LENGTH)
 const END = { x: drive.x, z: drive.z, yaw: drive.yaw } // stopped in the lane, facing west
@@ -125,7 +128,7 @@ onPath(0)
 
 // Along the street from where it stopped (positive: east).
 function onStreet(dx: number) {
-  Object.assign(drive, END, { x: END.x + dx, k: 0 })
+  Object.assign(drive, END, { x: END.x + dx, k: 0, s: LENGTH })
 }
 
 function go(p: Phase) {
@@ -178,7 +181,7 @@ export function step(dt: number) {
       at -= length
     }
     dt = 0
-    if (!st.shutter) st.set({ shutter: true })
+    if (!st.shutter || !st.cinema) st.set({ shutter: true, out: true, cinema: true })
   }
   drive.t += dt
   const t = drive.t

@@ -467,6 +467,12 @@ input[type='range']::-moz-range-thumb {
 .letterbox-on {
   transform: none;
 }
+/* a phone held upright gets a full-height shot: bars only make sense on a wide screen */
+@media (max-aspect-ratio: 9/10) {
+  .letterbox {
+    display: none;
+  }
+}
 /* then black, with the contact form in the middle */
 .away {
   position: fixed;
