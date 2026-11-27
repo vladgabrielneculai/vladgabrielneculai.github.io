@@ -3,6 +3,14 @@ import type { Tab } from './data'
 
 export type Part = 'hood' | 'trunk' | 'doorFL' | 'doorFR' | 'doorBL' | 'doorBR'
 export type Zone = Part | 'wheel'
+export type Weather = 'rain' | 'clear' | 'snow' | 'sakura'
+export const WEATHERS: [Weather, string][] = [
+  ['rain', 'Rain'],
+  ['clear', 'Clear'],
+  ['snow', 'Snow'],
+  ['sakura', 'Sakura'],
+]
+export const OPEN_TIME = 2.3 // seconds for the garage door to roll fully up or down
 
 // Each clickable area of the car, what to call it, and the tab it leads to.
 export const zones: Record<Zone, { name: string; tab: Tab | null }> = {
@@ -37,6 +45,10 @@ type State = {
   cinema: boolean // the drive is playing: every other control is hidden
   contactForm: boolean // the black screen with the contact form
   dark: boolean // the screen is fully black: the 3D scene can stop drawing
+  weather: Weather // what is falling on the street outside
+  story: boolean // phone layout: the garage on top, every section in one scroll below
+  live: boolean // the 3D garage has been started (phones wait for a tap, to save data)
+  tilt: boolean // phones: tilting the phone turns the garage a little
   set: (p: Partial<State>) => void
   toggle: (part: Part) => void
 }
@@ -52,6 +64,9 @@ export function skipIntro() {
   intro.lit = true
   useStore.getState().set({ intro: false, lights: true })
 }
+
+export const PHONE = '(max-width: 767.98px)'
+const phone = typeof matchMedia !== 'undefined' && matchMedia(PHONE).matches
 
 export const useStore = create<State>((set) => ({
   ready: false,
@@ -74,6 +89,12 @@ export const useStore = create<State>((set) => ({
   cinema: false,
   contactForm: false,
   dark: false,
+  // ?weather=snow picks the weather (used for captures)
+  weather: ((w) => (WEATHERS.some(([k]) => k === w) ? (w as Weather) : 'rain'))(typeof location !== 'undefined' ? new URLSearchParams(location.search).get('weather') : null),
+  story: phone,
+  live: !phone || (typeof location !== 'undefined' && new URLSearchParams(location.search).has('live')),
+  // Android needs no permission for the tilt sensor; iPhones ask, so there it starts off
+  tilt: phone && typeof DeviceOrientationEvent !== 'undefined' && !('requestPermission' in DeviceOrientationEvent),
   set: (p) => set(p),
   // Clicking a panel opens it and jumps to its tab; clicking again closes it.
   toggle: (part) => set((s) => (s.open[part] ? { open: { ...s.open, [part]: false } } : { open: { ...s.open, [part]: true }, tab: zones[part].tab ?? s.tab })),

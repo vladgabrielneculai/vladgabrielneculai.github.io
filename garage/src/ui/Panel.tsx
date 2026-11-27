@@ -144,7 +144,7 @@ function Contact() {
   )
 }
 
-const BODY: Record<Exclude<Tab, 'home'>, () => React.JSX.Element> = { about: About, experience: Experience, projects: Projects, skills: Skills, contact: Contact }
+export const BODY: Record<Exclude<Tab, 'home'>, () => React.JSX.Element> = { about: About, experience: Experience, projects: Projects, skills: Skills, contact: Contact }
 
 const STEPS = ['peek', 'half', 'tall'] as const
 

@@ -28,6 +28,11 @@ export function unlock() {
   return ctx
 }
 
+// A short vibration on phones that have it (Android), while sound is on.
+export function buzz(pattern: number | number[]) {
+  if (useStore.getState().sound) navigator.vibrate?.(pattern)
+}
+
 // Sounds that run continuously (engines, rain) only start once a click has unlocked audio.
 export const audioReady = () => ctx !== null && ctx.state === 'running'
 

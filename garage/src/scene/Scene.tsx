@@ -87,6 +87,34 @@ function GroundShadow() {
   )
 }
 
+// Phones: tilting the phone left or right turns the garage a few degrees, like looking round
+// the car. Only while the camera is parked outside it.
+function Tilt({ children }: { children: React.ReactNode }) {
+  const group = useRef<THREE.Group>(null)
+  const want = useRef(0)
+  const tilt = useStore((s) => s.tilt)
+  useEffect(() => {
+    want.current = 0
+    if (!tilt) return
+    let level: number | null = null
+    const on = (e: DeviceOrientationEvent) => {
+      if (e.gamma == null) return
+      // what counts as level drifts towards how the phone is held, so a new grip soon settles
+      level = level === null ? e.gamma : level + (e.gamma - level) * 0.01
+      want.current = THREE.MathUtils.clamp((e.gamma - level) / 25, -1, 1)
+    }
+    addEventListener('deviceorientation', on)
+    return () => removeEventListener('deviceorientation', on)
+  }, [tilt])
+  useFrame((_, dt) => {
+    if (!group.current) return
+    const st = useStore.getState()
+    const calm = st.tilt && st.tab !== 'about' && !st.cinema && !driving()
+    easing.damp(group.current.rotation, 'y', calm ? want.current * 0.13 : 0, 0.3, dt)
+  })
+  return <group ref={group}>{children}</group>
+}
+
 // Driver's seat (left-hand drive): where the camera sits for "About me", what it looks at,
 // and the point outside the open door it passes through on the way in.
 const HEAD = new THREE.Vector3(0.37, 1.15, -0.3)
@@ -110,6 +138,7 @@ function Rig() {
   const wasInside = useRef(false)
   const sheet = useStore((s) => s.sheet)
   const cinema = useStore((s) => s.cinema)
+  const story = useStore((s) => s.story)
   // Bumped when the car is back from a drive, to set the camera off for the current tab again.
   const [lap, setLap] = useState(0)
   const wasDriving = useRef(false)
@@ -212,11 +241,13 @@ function Rig() {
     const panel = tab !== 'home' && !cinema
     const playing = intro.t < INTRO_END
     // (during the drive the car has the whole, centred frame)
-    easing.damp(off.current, 'x', portrait || playing || cinema ? 0 : size.width * (panel ? 0.17 : -0.19), playing ? 0.01 : 0.3, dt)
+    // (on phones the garage has a stage of its own above the page: nothing to keep clear of)
+    easing.damp(off.current, 'x', story || portrait || playing || cinema ? 0 : size.width * (panel ? 0.17 : -0.19), playing ? 0.01 : 0.3, dt)
     // On phones the car sits above the sheet; with the sheet swiped down it gets the screen back.
     const lifted = panel && sheet !== 'peek'
-    easing.damp(off.current, 'y', portrait && !cinema ? size.height * (!lifted ? 0.14 : inside ? 0.3 : 0.27) : 0, 0.3, dt)
-    cam.fov = portrait ? 50 : inside ? 42 : 30
+    easing.damp(off.current, 'y', portrait && !cinema && !story ? size.height * (!lifted ? 0.14 : inside ? 0.3 : 0.27) : 0, 0.3, dt)
+    // the phone stage is about square: a wider lens keeps the whole car in it
+    cam.fov = portrait ? 50 : story ? (inside ? 58 : 40) : inside ? 42 : 30
     cam.setViewOffset(size.width, size.height, off.current.x, off.current.y, size.width, size.height)
 
     // While the car is on the move, the camera stands inside the garage and watches it go
@@ -347,19 +378,21 @@ export function Scene() {
           }
         />
       )}
-      <Suspense fallback={null}>
-        <Garage />
-        <Bvh firstHitOnly>
-          <Car />
-        </Bvh>
-        <GroundShadow />
-      </Suspense>
-      {/* The other cars load once the Mazda is on screen, so they never hold up the opening. */}
-      {ready && (
+      <Tilt>
         <Suspense fallback={null}>
-          <Display />
+          <Garage />
+          <Bvh firstHitOnly>
+            <Car />
+          </Bvh>
+          <GroundShadow />
         </Suspense>
-      )}
+        {/* The other cars load once the Mazda is on screen, so they never hold up the opening. */}
+        {ready && (
+          <Suspense fallback={null}>
+            <Display />
+          </Suspense>
+        )}
+      </Tilt>
       <Rig />
     </Canvas>
   )

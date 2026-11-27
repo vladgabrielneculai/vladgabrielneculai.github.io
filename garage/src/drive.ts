@@ -7,8 +7,8 @@
 // z = -15.45). The motion follows a simple car model: the rear axle rolls along a path whose
 // curvature only ever changes gradually (as a driver winds the wheel on and off), the front
 // wheels are steered to exactly that curvature, and speed changes smoothly.
-import { starter } from './sound'
-import { useStore } from './store'
+import { rattle, starter } from './sound'
+import { OPEN_TIME, useStore } from './store'
 
 export const WHEELBASE = 2.735
 export const REAR = 1.5 // the car's origin sits this far ahead of its rear axle
@@ -147,7 +147,9 @@ export function leave() {
   drive.faded = false
   drive.started = !s.engine
   if (!s.engine) starter(0.85)
-  s.set({ out: true, cinema: true, engine: true, lights: true, rev: false, adjust: false, open: { hood: false, trunk: false, doorFL: false, doorFR: false, doorBL: false, doorBR: false } })
+  // the door rolls up first if it is down
+  if (!s.shutter) rattle(OPEN_TIME)
+  s.set({ shutter: true, out: true, cinema: true, engine: true, lights: true, rev: false, adjust: false, open: { hood: false, trunk: false, doorFL: false, doorFR: false, doorBL: false, doorBR: false } })
   go('starting')
 }
 
@@ -187,9 +189,9 @@ export function step(dt: number) {
       drive.cam = 0
       break
     case 'starting':
-      // let the engine catch, then wait for any passing car to clear
+      // let the engine catch and the door roll up, then wait for any passing car to clear
       drive.speed = 0
-      if (t > (drive.started ? 1.9 : 0.5)) go(drive.street ? 'waiting' : 'reverse')
+      if (t > (drive.started ? 1.9 : 0.5) && st.doorUp) go(drive.street ? 'waiting' : 'reverse')
       break
     case 'waiting':
       if (!drive.street) go('reverse')

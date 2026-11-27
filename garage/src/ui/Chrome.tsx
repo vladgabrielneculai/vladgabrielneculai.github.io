@@ -1,8 +1,8 @@
 import { useProgress } from '@react-three/drei'
 import { profile, tabs } from '../data'
 import { leave } from '../drive'
-import { starter, unlock } from '../sound'
-import { useStore } from '../store'
+import { buzz, rattle, starter, unlock } from '../sound'
+import { OPEN_TIME, useStore, WEATHERS } from '../store'
 
 // Tab icons for the phone navigation bar (24 px line icons).
 const ICONS: Record<string, string> = {
@@ -65,18 +65,26 @@ function City() {
   )
 }
 
-function Adjust() {
+// Turning the tilt sensor on: iPhones ask the visitor first, and only from a tap.
+async function toggleTilt() {
+  const s = useStore.getState()
+  if (s.tilt) return s.set({ tilt: false })
+  const D = DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> }
+  if (D.requestPermission) {
+    try {
+      if ((await D.requestPermission()) !== 'granted') return
+    } catch {
+      return
+    }
+  }
+  s.set({ tilt: true })
+}
+
+// The controls in "Adjust the car": a popover on desktop, a drawer on phones.
+export function AdjustControls() {
   const s = useStore()
   return (
-    <div className="adjust">
-      <button className="btn btn-quiet pointer-events-auto shadow-sm" onClick={() => s.set({ adjust: !s.adjust })} aria-expanded={s.adjust}>
-        {s.adjust ? 'Done' : 'Adjust the car'}
-      </button>
-      <div
-        aria-hidden={!s.adjust}
-        inert={!s.adjust}
-        className={`w-64 rounded-2xl border border-line bg-white/90 p-4 text-sm shadow-xl backdrop-blur transition-opacity duration-200 ${s.adjust ? 'pointer-events-auto opacity-100' : 'opacity-0'}`}
-      >
+    <>
         <label className="mb-3 block">
           <span className="mb-1.5 flex justify-between">
             <span>Ride height</span>
@@ -91,12 +99,38 @@ function Adjust() {
           </span>
           <input type="range" min={0} max={1} step={0.01} value={s.camber} onChange={(e) => s.set({ camber: +e.target.value })} />
         </label>
+        <div className="mb-3">
+          <span className="mb-1.5 block">Weather outside</span>
+          <div role="radiogroup" aria-label="Weather outside" className="grid grid-cols-4 gap-1 rounded-xl bg-ink/5 p-1">
+            {WEATHERS.map(([w, label]) => (
+              <button
+                key={w}
+                role="radio"
+                aria-checked={s.weather === w}
+                className={`rounded-lg py-1.5 text-xs font-semibold transition ${s.weather === w ? 'bg-white text-ink shadow-sm' : 'text-ink/55 hover:text-ink'}`}
+                onClick={() => {
+                  // the weather is only seen through the garage door: roll it up if it is down
+                  if (!s.shutter && !s.out) {
+                    s.set({ weather: w, shutter: true })
+                    rattle(OPEN_TIME)
+                  } else s.set({ weather: w })
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
         <Switch label="Lights" on={s.lights} toggle={() => s.set({ lights: !s.lights })} />
+        {s.story && <Switch label="Tilt the phone to look around" on={s.tilt} toggle={toggleTilt} />}
         <Switch
           label="Engine"
           on={s.engine}
           toggle={() => {
-            if (!s.engine) starter(0.85)
+            if (!s.engine) {
+              starter(0.85)
+              buzz([60, 40, 60, 40, 120])
+            }
             s.set({ engine: !s.engine, rev: false })
           }}
         />
@@ -106,6 +140,7 @@ function Adjust() {
           onPointerDown={(e) => {
             e.currentTarget.setPointerCapture(e.pointerId)
             unlock()
+            buzz(80)
             s.set({ rev: true })
           }}
           onPointerUp={() => s.set({ rev: false })}
@@ -118,6 +153,23 @@ function Adjust() {
           Hold to rev
         </button>
         <Switch label="Sound" on={s.sound} toggle={() => s.set({ sound: !s.sound })} last />
+    </>
+  )
+}
+
+function Adjust() {
+  const s = useStore()
+  return (
+    <div className="adjust">
+      <button className="btn btn-quiet pointer-events-auto shadow-sm" onClick={() => s.set({ adjust: !s.adjust })} aria-expanded={s.adjust}>
+        {s.adjust ? 'Done' : 'Adjust the car'}
+      </button>
+      <div
+        aria-hidden={!s.adjust}
+        inert={!s.adjust}
+        className={`w-64 rounded-2xl border border-line bg-white/90 p-4 text-sm shadow-xl backdrop-blur transition-opacity duration-200 ${s.adjust ? 'pointer-events-auto opacity-100' : 'opacity-0'}`}
+      >
+        <AdjustControls />
       </div>
     </div>
   )

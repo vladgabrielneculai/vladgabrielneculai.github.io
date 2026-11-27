@@ -1,13 +1,14 @@
-// The garage door: a roller shutter with a painted mural that rolls up onto a rainy night
-// street. The street is painted, not modelled: a shop-front backdrop, a wet road, rain, and
-// now and then a car's headlamps sweeping past. All artwork is original and drawn here.
+// The garage door: a roller shutter with a painted mural that rolls up onto a night street.
+// The street is painted, not modelled: a shop-front backdrop, the road, the weather (rain,
+// a clear night, snow or cherry blossom), and now and then a car's headlamps sweeping past.
+// All artwork is original and drawn here.
 import { useGLTF } from '@react-three/drei'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { drive } from '../drive'
 import { makeEngine, rain, rattle, type Engine } from '../sound'
-import { useStore } from '../store'
+import { OPEN_TIME, useStore, type Weather } from '../store'
 import { BASE, dress } from './Display'
 import { JP, LATIN, RED, text, texture, useFonts } from './Jdm'
 
@@ -30,8 +31,6 @@ const LANES = [
   { z: NEAR + 1.25, dir: -1 },
   { z: NEAR + 3.75, dir: 1 },
 ]
-
-const OPEN_TIME = 2.3 // seconds for the shutter to roll fully up or down
 
 function rng(seed: number) {
   return () => {
@@ -829,7 +828,7 @@ function facade(g: G) {
 const RW = 2048
 const RH = 512
 // Road: the canvas top is the far kerb, the bottom the near one.
-function road(g: G) {
+function roadBase(g: G, wet: boolean) {
   const rx = (x: number) => (x + WIDTH / 2) * (RW / WIDTH)
   g.fillStyle = '#0c0e12'
   g.fillRect(0, 0, RW, RH)
@@ -839,25 +838,14 @@ function road(g: G) {
     g.fillRect(rand() * RW, rand() * RH, 1.5, 1.5)
   }
   // standing water: slightly darker, glassier patches
-  for (let i = 0; i < 14; i++) {
+  for (let i = 0; i < (wet ? 14 : 0); i++) {
     g.fillStyle = 'rgba(0,0,0,0.25)'
     g.beginPath()
     g.ellipse(rand() * RW, rand() * RH, 80 + rand() * 220, 20 + rand() * 50, 0, 0, Math.PI * 2)
     g.fill()
   }
-  // the shop lights smeared towards the viewer by the wet surface
-  g.save()
-  g.globalCompositeOperation = 'lighter'
-  g.filter = 'blur(10px)'
-  for (const [x, c, a, w] of LIGHTS) {
-    const grad = g.createLinearGradient(0, 0, 0, RH * 0.95)
-    grad.addColorStop(0, c)
-    grad.addColorStop(1, 'rgba(0,0,0,0)')
-    g.globalAlpha = a * 0.55
-    g.fillStyle = grad
-    g.fillRect(rx(x) - (w * RW) / WIDTH / 2, 0, (w * RW) / WIDTH, RH * 0.95)
-  }
-  g.restore()
+  // the shop lights smeared towards the viewer by the wet surface; dry, just a glow
+  smear(g, wet ? 0.55 : 0.16, wet ? 0.95 : 0.4)
   // markings: white edge lines and a dashed centre line
   const mz = (fromFar: number) => fromFar * (RH / ROAD)
   g.fillStyle = 'rgba(225,228,232,0.6)'
@@ -881,7 +869,90 @@ function road(g: G) {
   }
 }
 
-function pavement(g: G, w: number, h: number, base: string, lit: (x: number) => number) {
+function smear(g: G, alpha: number, length: number) {
+  const rx = (x: number) => (x + WIDTH / 2) * (RW / WIDTH)
+  g.save()
+  g.globalCompositeOperation = 'lighter'
+  g.filter = 'blur(10px)'
+  for (const [x, c, a, w] of LIGHTS) {
+    const grad = g.createLinearGradient(0, 0, 0, RH * length)
+    grad.addColorStop(0, c)
+    grad.addColorStop(1, 'rgba(0,0,0,0)')
+    g.globalAlpha = a * alpha
+    g.fillStyle = grad
+    g.fillRect(rx(x) - (w * RW) / WIDTH / 2, 0, (w * RW) / WIDTH, RH * length)
+  }
+  g.restore()
+}
+
+// A layer of snow, thin and grey where tyres have pressed it into slush along `tracks` (px).
+function snow(g: G, w: number, h: number, tracks: number[] = [], track = 0) {
+  const c = document.createElement('canvas')
+  c.width = w
+  c.height = h
+  const s = c.getContext('2d')!
+  s.fillStyle = 'rgba(200,207,224,0.94)'
+  s.fillRect(0, 0, w, h)
+  const rand = rng(17)
+  for (let i = 0; i < (w * h) / 40; i++) {
+    s.fillStyle = rand() < 0.5 ? `rgba(255,255,255,${rand() * 0.45})` : `rgba(120,130,155,${rand() * 0.22})`
+    s.fillRect(rand() * w, rand() * h, 2, 2)
+  }
+  s.globalCompositeOperation = 'destination-out'
+  s.filter = 'blur(4px)'
+  for (const y of tracks)
+    for (let x = 0; x < w; x += 16) {
+      s.fillStyle = `rgba(0,0,0,${0.7 + rand() * 0.2})`
+      s.fillRect(x, y - track / 2 + Math.sin(x / 140 + y) * 3, 18, track)
+    }
+  g.drawImage(c, 0, 0)
+}
+
+// Fallen cherry petals, gathered along the kerbs when `kerbs` is set.
+function petals(g: G, w: number, h: number, n: number, size: number, kerbs = false) {
+  const rand = rng(31)
+  for (let i = 0; i < n; i++) {
+    const v = rand()
+    const y = kerbs ? (rand() < 0.5 ? v * v : 1 - v * v) * h : v * h
+    g.save()
+    g.translate(rand() * w, y)
+    g.rotate(rand() * Math.PI)
+    g.fillStyle = `rgba(${245 + rand() * 10},${150 + rand() * 50},${178 + rand() * 35},${0.5 + rand() * 0.45})`
+    g.beginPath()
+    g.ellipse(0, 0, size * (1 + rand() * 0.8), size * (0.6 + rand() * 0.4), 0, 0, Math.PI * 2)
+    g.fill()
+    g.restore()
+  }
+}
+
+function road(g: G, weather: Weather) {
+  roadBase(g, weather === 'rain')
+  const mz = (fromFar: number) => fromFar * (RH / ROAD)
+  if (weather === 'snow') {
+    // two wheel tracks down each lane
+    const tracks = LANES.flatMap((l) => [l.z - NEAR - 0.72, l.z - NEAR + 0.72]).map((z) => mz(ROAD - z))
+    snow(g, RW, RH, tracks, mz(0.34))
+    smear(g, 0.22, 0.5)
+  }
+  if (weather === 'sakura') petals(g, RW, RH, 1800, 3, true)
+}
+
+function pavement(g: G, w: number, h: number, base: string, lit: (x: number) => number, weather: Weather = 'rain') {
+  pavementBase(g, w, h, base, lit)
+  if (weather === 'snow') {
+    snow(g, w, h)
+    for (let x = 0; x < w; x += 4) {
+      const k = lit((x / w - 0.5) * WIDTH)
+      if (k > 0.01) {
+        g.fillStyle = `rgba(255,206,150,${Math.min(0.4, k * 0.8)})`
+        g.fillRect(x, 0, 4, h)
+      }
+    }
+  }
+  if (weather === 'sakura') petals(g, w, h, 700, 1.6)
+}
+
+function pavementBase(g: G, w: number, h: number, base: string, lit: (x: number) => number) {
   g.fillStyle = base
   g.fillRect(0, 0, w, h)
   const rand = rng(9)
@@ -1014,6 +1085,55 @@ const rippleFragment = /* glsl */ `
     gl_FragColor = vec4(vec3(0.75, 0.8, 0.9), a * opacity);
   }
 `
+// Snowflakes and cherry petals: points drifting down, swaying, petals tumbling as they fall.
+const flakeVertex = /* glsl */ `
+  attribute float seed;
+  uniform float time;
+  uniform float speed;
+  uniform float sway;
+  uniform float size;
+  uniform float scale;
+  varying float vSeed;
+  varying float vSpin;
+  void main() {
+    vec3 p = position;
+    p.y = mod(p.y - time * speed * (0.7 + 0.6 * seed), 7.2) - 0.05;
+    p.x += sin(time * (0.5 + seed) + seed * 40.0) * sway;
+    p.z += cos(time * (0.4 + seed * 0.5) + seed * 20.0) * sway * 0.5;
+    vSeed = seed;
+    vSpin = time * (1.0 + seed * 2.0) + seed * 30.0;
+    vec4 mv = modelViewMatrix * vec4(p, 1.0);
+    gl_PointSize = min(48.0, size * (0.6 + 0.8 * seed) * scale / -mv.z);
+    gl_Position = projectionMatrix * mv;
+  }
+`
+const flakeFragment = /* glsl */ `
+  uniform float petal;
+  uniform float opacity;
+  varying float vSeed;
+  varying float vSpin;
+  void main() {
+    vec2 c = gl_PointCoord - 0.5;
+    if (petal < 0.5) {
+      float a = smoothstep(0.5, 0.12, length(c));
+      gl_FragColor = vec4(0.86, 0.89, 0.97, a * opacity);
+      return;
+    }
+    float cs = cos(vSpin), sn = sin(vSpin);
+    c = mat2(cs, -sn, sn, cs) * c;
+    c.x /= 0.3 + 0.7 * abs(sin(vSpin * 0.6)); // tumbling: seen edge-on now and then
+    float e = length(c * vec2(1.0, 1.8));
+    float a = smoothstep(0.44, 0.36, e) * smoothstep(0.02, 0.1, length(c - vec2(0.0, 0.27)));
+    vec3 col = mix(vec3(1.0, 0.8, 0.87), vec3(0.97, 0.58, 0.72), vSeed) * (0.8 + 0.4 * (0.5 - c.y));
+    gl_FragColor = vec4(col * 0.9, a * opacity);
+  }
+`
+// How each kind of weather falls: count, metres per second, sway, size in metres.
+const FALL = {
+  snow: { n: 1400, speed: 0.9, sway: 0.22, size: 0.05, petal: 0, opacity: 0.9 },
+  sakura: { n: 360, speed: 0.6, sway: 0.55, size: 0.1, petal: 1, opacity: 0.95 },
+}
+
 const plainVertex = /* glsl */ `
   varying vec2 vUv;
   void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
@@ -1026,13 +1146,6 @@ function useArt(ready: boolean, lite: boolean) {
     if (!ready) return null
     const door = texture(2048, 1024, mural)
     const front = texture(FW, FH, facade)
-    const tarmac = texture(RW, RH, road)
-    const near = texture(1024, 48, (g) =>
-      pavement(g, 1024, 48, '#2a2c31', (x) => 0.45 * Math.exp(-((x / 2.6) ** 2)) + 0.25 * Math.exp(-(((x + 4.9) / 1.2) ** 2))),
-    )
-    const far = texture(1024, 48, (g) =>
-      pavement(g, 1024, 48, '#26242a', (x) => LIGHTS.reduce((s, [lx, , a, w]) => s + a * 0.35 * Math.exp(-(((x - lx) / (w * 0.7 + 0.4)) ** 2)), 0)),
-    )
     const wires = texture(2048, Math.round(POLE_H * (2048 / WIDTH)), poles)
     const head = radial('255,246,220')
     const tail = radial('255,40,30')
@@ -1110,12 +1223,56 @@ function useArt(ready: boolean, lite: boolean) {
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     })
-    return { door, front, tarmac, near, far, wires, head, tail, pool, streak, spill, rainGeo, rain, ripples }
+    // Snow and petals share one set of points; each weather draws as many as it needs.
+    const most = Math.max(FALL.snow.n, FALL.sakura.n)
+    const fpos = new Float32Array(most * 3)
+    const seed = new Float32Array(most)
+    for (let i = 0; i < most; i++) {
+      fpos.set([(rand() - 0.5) * WIDTH, rand() * 7.2, -(0.15 + rand() * depth)], i * 3)
+      seed[i] = rand()
+    }
+    const flakeGeo = new THREE.BufferGeometry()
+    flakeGeo.setAttribute('position', new THREE.BufferAttribute(fpos, 3))
+    flakeGeo.setAttribute('seed', new THREE.BufferAttribute(seed, 1))
+    const flakes = new THREE.ShaderMaterial({
+      vertexShader: flakeVertex,
+      fragmentShader: flakeFragment,
+      uniforms: Object.fromEntries(['time', 'speed', 'sway', 'size', 'scale', 'petal', 'opacity'].map((k) => [k, { value: 0 }])),
+      transparent: true,
+      depthWrite: false,
+    })
+    return { door, front, wires, head, tail, pool, streak, spill, rainGeo, rain, ripples, flakeGeo, flakes }
   }, [ready, lite])
+}
+
+// The ground outside, painted for the weather: repainted when the weather changes.
+function useGround(ready: boolean, weather: Weather) {
+  const ground = useMemo(() => {
+    if (!ready) return null
+    return {
+      tarmac: texture(RW, RH, (g) => road(g, weather)),
+      near: texture(1024, 48, (g) =>
+        pavement(g, 1024, 48, '#2a2c31', (x) => 0.45 * Math.exp(-((x / 2.6) ** 2)) + 0.25 * Math.exp(-(((x + 4.9) / 1.2) ** 2)), weather),
+      ),
+      far: texture(1024, 48, (g) =>
+        pavement(g, 1024, 48, '#26242a', (x) => LIGHTS.reduce((s, [lx, , a, w]) => s + a * 0.35 * Math.exp(-(((x - lx) / (w * 0.7 + 0.4)) ** 2)), 0), weather),
+      ),
+    }
+  }, [ready, weather])
+  useEffect(
+    () => () => {
+      if (ground) for (const t of Object.values(ground)) t.dispose()
+    },
+    [ground],
+  )
+  return ground
 }
 
 const unlit = { toneMapped: false } as const
 const glowy = { toneMapped: false, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide } as const
+
+// How strongly the road mirrors lamps and how loud tyres hiss on it.
+const WET: Record<Weather, number> = { rain: 1, clear: 0.25, snow: 0.4, sakura: 0.25 }
 
 // The cars that drive past: the two models from the side bays, picked at random and in a
 // random colour each time. Lamp heights and half-widths are in metres.
@@ -1181,7 +1338,8 @@ function Cars({ a, traffic, door, wall }: { a: Art; traffic: React.RefObject<Tra
       const d = Math.hypot(tr.x, lane.z + 6) // the listener stands about 6 m inside the door
       const away = (lane.dir * SPEED * tr.x) / d // m/s, positive when moving away
       const level = (door.current?.up ?? 0) / (1 + (d / 7) ** 2)
-      voice.current?.set((tr.model ? 2600 : 2300) * (343 / (343 + away)), 0.35, level * 1.6, tr.x / 9, tr.model ? 0 : 1, level * 1.4)
+      const hiss = WET[useStore.getState().weather]
+      voice.current?.set((tr.model ? 2600 : 2300) * (343 / (343 + away)), 0.35, level * 1.6, tr.x / 9, tr.model ? 0 : 1, level * 1.4 * hiss)
       // wheels roll with the road
       for (const w of cars[tr.model].wheels) w.pivot.rotation.x += (SPEED * dt) / w.radius
     }
@@ -1208,6 +1366,7 @@ function Cars({ a, traffic, door, wall }: { a: Art; traffic: React.RefObject<Tra
     lights.current.position.set(tr.x, 0, wall - lane.z)
   })
 
+  const wet = WET[useStore((s) => s.weather)]
   const keep = (k: string) => (o: THREE.Object3D | null) => {
     parts.current[k] = o
   }
@@ -1237,11 +1396,11 @@ function Cars({ a, traffic, door, wall }: { a: Art; traffic: React.RefObject<Tra
         </mesh>
         <mesh ref={keep('streakHead')} rotation-x={-Math.PI / 2} position={[2.15, -KERB + 0.012, 1.4]}>
           <planeGeometry args={[0.6, 2.6]} />
-          <meshBasicMaterial map={a.streak} opacity={0.5} color="#fff1d6" {...glowy} />
+          <meshBasicMaterial map={a.streak} opacity={0.5 * wet} color="#fff1d6" {...glowy} />
         </mesh>
         <mesh ref={keep('streakTail')} rotation-x={-Math.PI / 2} position={[-2.15, -KERB + 0.012, 1.4]}>
           <planeGeometry args={[0.4, 2.2]} />
-          <meshBasicMaterial map={a.streak} opacity={0.45} color="#ff3020" {...glowy} />
+          <meshBasicMaterial map={a.streak} opacity={0.45 * wet} color="#ff3020" {...glowy} />
         </mesh>
       </group>
     </>
@@ -1252,6 +1411,8 @@ export function Street({ room }: { room: Room }) {
   const ready = useFonts()
   const lite = useStore((s) => s.lite)
   const a = useArt(ready, lite)
+  const weather = useStore((s) => s.weather)
+  const ground = useGround(ready, weather)
 
   const k = useRef({ t: 0, up: 0, flashed: true }) // t: 0 shut .. 1 fully up; up: t eased
   const door = useRef<THREE.Mesh>(null)
@@ -1272,7 +1433,7 @@ export function Street({ room }: { room: Room }) {
   const down = useRef<[number, number]>([0, 0])
   const wall = -room.z
 
-  useFrame((_, dt) => {
+  useFrame((state, dt) => {
     if (!a || !door.current || !bar.current || !street.current || !spill.current || !sweep.current || !sweepMesh.current) return
     const s = useStore.getState()
     const st = k.current
@@ -1294,7 +1455,7 @@ export function Street({ room }: { room: Room }) {
     street.current.visible = st.t > 0
     spill.current.opacity = up * 0.3
     // rain heard through the doorway, as far as it is open
-    if (up > 0 || st.up > 0) rain(up)
+    if (up > 0 || st.up > 0) rain(s.weather === 'rain' ? up : 0)
     st.up = up
     if (!street.current.visible) {
       sweep.current.opacity = 0
@@ -1304,6 +1465,15 @@ export function Street({ room }: { room: Room }) {
     const time = performance.now() / 1000
     a.rain.uniforms.time.value = time
     a.ripples.uniforms.time.value = time
+    const fall = s.weather === 'snow' || s.weather === 'sakura' ? FALL[s.weather] : null
+    if (fall) {
+      const u = a.flakes.uniforms
+      u.time.value = time
+      for (const key of ['speed', 'sway', 'size', 'petal', 'opacity'] as const) u[key].value = fall[key]
+      const cam = state.camera as THREE.PerspectiveCamera
+      u.scale.value = (state.size.height * state.gl.getPixelRatio()) / (2 * Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2))
+      a.flakeGeo.setDrawRange(0, lite ? fall.n / 2 : fall.n)
+    }
 
     // Every so often a car goes by.
     const tr = traffic.current
@@ -1335,7 +1505,7 @@ export function Street({ room }: { room: Room }) {
     sweepMesh.current.position.x = THREE.MathUtils.clamp(tr.x * 0.35, -3, 3)
   })
 
-  if (!a) return null
+  if (!a || !ground) return null
 
   const onDown = (e: ThreeEvent<PointerEvent>) => (down.current = [e.clientX, e.clientY])
   const onClick = (e: ThreeEvent<MouseEvent>) => {
@@ -1416,18 +1586,18 @@ export function Street({ room }: { room: Room }) {
         </mesh>
         <mesh rotation-x={-Math.PI / 2} position={[0, 0, wall - NEAR / 2]}>
           <planeGeometry args={[WIDTH, NEAR]} />
-          <meshBasicMaterial map={a.near} {...unlit} />
+          <meshBasicMaterial map={ground.near} {...unlit} />
         </mesh>
         <mesh rotation-x={-Math.PI / 2} position={[0, -KERB, roadZ]}>
           <planeGeometry args={[WIDTH, ROAD]} />
-          <meshBasicMaterial map={a.tarmac} {...unlit} />
+          <meshBasicMaterial map={ground.tarmac} {...unlit} />
         </mesh>
-        <mesh rotation-x={-Math.PI / 2} position={[0, -KERB + 0.004, roadZ]} material={a.ripples}>
+        <mesh rotation-x={-Math.PI / 2} position={[0, -KERB + 0.004, roadZ]} material={a.ripples} visible={weather === 'rain'}>
           <planeGeometry args={[WIDTH, ROAD]} />
         </mesh>
         <mesh rotation-x={-Math.PI / 2} position={[0, 0, farZ]}>
           <planeGeometry args={[WIDTH, FAR]} />
-          <meshBasicMaterial map={a.far} {...unlit} />
+          <meshBasicMaterial map={ground.far} {...unlit} />
         </mesh>
         {/* the far kerb's face, seen from the garage */}
         <mesh position={[0, -KERB / 2, wall - NEAR - ROAD]}>
@@ -1438,7 +1608,8 @@ export function Street({ room }: { room: Room }) {
           <planeGeometry args={[WIDTH, POLE_H]} />
           <meshBasicMaterial map={a.wires} transparent alphaTest={0.02} depthWrite={false} {...unlit} />
         </mesh>
-        <lineSegments geometry={a.rainGeo} material={a.rain} position={[0, 0, wall]} frustumCulled={false} />
+        <lineSegments geometry={a.rainGeo} material={a.rain} position={[0, 0, wall]} frustumCulled={false} visible={weather === 'rain'} />
+        <points geometry={a.flakeGeo} material={a.flakes} position={[0, 0, wall]} frustumCulled={false} visible={weather === 'snow' || weather === 'sakura'} />
 
         {opened && (
           <Suspense fallback={null}>
