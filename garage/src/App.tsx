@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Scene } from './scene/Scene'
 import { skipIntro, useStore } from './store'
+import { Away } from './ui/Away'
 import { Chrome, Loader } from './ui/Chrome'
 import { Panel } from './ui/Panel'
 
@@ -38,6 +39,7 @@ export default function App() {
         <Chrome webgl={webgl} />
         <Panel />
       </div>
+      {webgl && <Away />}
       <Loader />
     </>
   )

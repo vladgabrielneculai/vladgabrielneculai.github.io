@@ -34,6 +34,9 @@ type State = {
   sound: boolean // all sound on or muted
   doorUp: boolean // the shutter is all the way up
   out: boolean // the Mazda has gone out for a drive (see drive.ts)
+  cinema: boolean // the drive is playing: every other control is hidden
+  contactForm: boolean // the black screen with the contact form
+  dark: boolean // the screen is fully black: the 3D scene can stop drawing
   set: (p: Partial<State>) => void
   toggle: (part: Part) => void
 }
@@ -68,6 +71,9 @@ export const useStore = create<State>((set) => ({
   sound: true,
   doorUp: false,
   out: false,
+  cinema: false,
+  contactForm: false,
+  dark: false,
   set: (p) => set(p),
   // Clicking a panel opens it and jumps to its tab; clicking again closes it.
   toggle: (part) => set((s) => (s.open[part] ? { open: { ...s.open, [part]: false } } : { open: { ...s.open, [part]: true }, tab: zones[part].tab ?? s.tab })),

@@ -430,3 +430,71 @@ input[type='range']::-moz-range-thumb {
   opacity: 0.3;
   cursor: default;
 }
+
+/* "Drive into the city": while it plays, every other control steps aside */
+.cinema header,
+.cinema .intro,
+.cinema .scrim,
+.cinema .tabs,
+.cinema .adjust,
+.cinema .city,
+.cinema .panel {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 0.5s;
+}
+.letterbox {
+  position: fixed;
+  z-index: 60;
+  left: 0;
+  right: 0;
+  height: 9vh;
+  background: #000;
+  transition: transform 0.9s cubic-bezier(0.65, 0, 0.35, 1);
+  pointer-events: none;
+}
+.letterbox-top {
+  top: 0;
+  transform: translateY(-100%);
+}
+.letterbox-bottom {
+  bottom: 0;
+  transform: translateY(100%);
+}
+.letterbox-on {
+  transform: none;
+}
+/* then black, with the contact form in the middle */
+.away {
+  position: fixed;
+  z-index: 70;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.9s ease;
+}
+.away-on {
+  opacity: 1;
+  pointer-events: auto;
+}
+.away-card {
+  position: relative;
+  width: min(100%, 26rem);
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  padding: 1.6rem;
+  background: #fff;
+  border-radius: 1.6rem;
+  box-shadow: 0 30px 80px rgb(0 0 0 / 0.6);
+  animation: away-in 0.6s 0.7s both cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes away-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+}

@@ -12,9 +12,12 @@ export function unlock() {
     if (!ctx) {
       const c = new AudioContext()
       const m = c.createGain()
-      m.gain.value = useStore.getState().sound ? 1 : 0
+      // muted by the Sound switch, and while the contact form is up (the scene is paused behind
+      // it, so its engines would otherwise hold their last note)
+      const level = (s: ReturnType<typeof useStore.getState>) => (s.sound && !s.contactForm ? 1 : 0)
+      m.gain.value = level(useStore.getState())
       m.connect(c.destination)
-      useStore.subscribe((s) => m.gain.setTargetAtTime(s.sound ? 1 : 0, c.currentTime, 0.05))
+      useStore.subscribe((s) => m.gain.setTargetAtTime(level(s), c.currentTime, 0.25))
       ctx = c
       master = m
     }

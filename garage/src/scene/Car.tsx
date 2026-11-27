@@ -3,7 +3,7 @@ import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { easing } from 'maath'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { drive, step } from '../drive'
+import { WHEELBASE, drive, ground, step } from '../drive'
 import { makeEngine, type Engine } from '../sound'
 import { useStore, zones, type Part, type Zone } from '../store'
 import { ROOM } from './Garage'
@@ -16,6 +16,9 @@ const MAX_DROP = 0.045 // metres
 const MAX_CAMBER = 0.105 // radians (6°)
 const CRANK = 0.85 // seconds on the starter before the engine catches
 const IDLE = 780 // rpm
+const TRACK = 1.56 // metres between the left and right wheels
+const SPRING = 100 // suspension stiffness (about 1.6 Hz)
+const DAMP = 12 // and damping
 
 // Open angle and hinge axis per moving panel. After normalising, the car faces +z and y is up.
 const OPEN: Record<Part, { axis: 'x' | 'y'; angle: number }> = {
@@ -494,6 +497,8 @@ export function Car() {
   useEffect(() => () => eng.current.voice?.stop(), [])
   const down = useRef<[number, number]>([0, 0])
   const mover = useRef<THREE.Group>(null)
+  const bases = useMemo(() => r.wheels.map((w) => w.pivot.position.clone()), [r])
+  const sus = useRef({ p: 0, pv: 0, r: 0, rv: 0 }) // body pitch and roll, and how fast they change
 
   useEffect(() => {
     useStore.getState().set({ ready: true })
@@ -504,13 +509,39 @@ export function Car() {
     const a = v.current
     // Out for a drive: place the car, turn the wheels, steer the fronts.
     step(dt)
+    // Each wheel finds the ground under it (only the kerb is not flat), the car sits on their
+    // average, and the body tips with the difference.
+    const cos = Math.cos(drive.yaw)
+    const sin = Math.sin(drive.yaw)
+    const h = bases.map((b) => ground(drive.z - b.x * sin + b.z * cos))
+    drive.y = h.reduce((t, v) => t + v, 0) / h.length
+    const side = (pick: (w: (typeof r.wheels)[number]) => boolean) => {
+      const l = r.wheels.map((w, i) => (pick(w) ? h[i] : NaN)).filter((v) => !Number.isNaN(v))
+      return l.reduce((t, v) => t + v, 0) / l.length
+    }
+    const groundPitch = Math.atan((side((w) => !w.front) - side((w) => w.front)) / WHEELBASE)
+    const groundRoll = Math.atan((side((w) => w.side > 0) - side((w) => w.side < 0)) / TRACK)
     if (mover.current) {
       mover.current.position.set(drive.x, drive.y, drive.z)
       mover.current.rotation.y = drive.yaw
     }
-    for (const w of r.wheels) {
+    r.wheels.forEach((w, i) => {
       w.spin.rotation.x = drive.roll / r.tyreRadius
       w.pivot.rotation.y = w.front ? drive.steer : 0
+      w.pivot.position.y = bases[i].y + h[i] - drive.y
+    })
+    // Suspension: the body squats as it pulls away, dives as it brakes and leans out of turns,
+    // on springs, so it settles rather than snapping.
+    const q = sus.current
+    const pitchTo = groundPitch - 0.009 * THREE.MathUtils.clamp(drive.accel, -4, 4)
+    const rollTo = groundRoll + 0.007 * drive.speed * drive.speed * drive.k
+    const n = Math.ceil(Math.min(dt, 1 / 20) / 0.005)
+    const h1 = Math.min(dt, 1 / 20) / n
+    for (let i = 0; i < n; i++) {
+      q.pv += (SPRING * (pitchTo - q.p) - DAMP * q.pv) * h1
+      q.p += q.pv * h1
+      q.rv += (SPRING * (rollTo - q.r) - DAMP * q.rv) * h1
+      q.r += q.rv * h1
     }
     for (const part of Object.keys(OPEN) as Part[]) {
       const p = r.pivots[part]
@@ -535,7 +566,10 @@ export function Car() {
     const running = now - e.t0
     const cranking = e.on && running < CRANK
     // under way, the revs follow the road speed and the pull
-    const cruise = IDLE + Math.abs(drive.speed) * 330 + Math.max(0, Math.abs(drive.speed) > 0.2 ? drive.accel * Math.sign(drive.speed) : 0) * 420
+    // under way, the revs follow the road speed through the gears (reverse and first are short)
+    const road = Math.abs(drive.speed)
+    const perMs = drive.speed < 0 || road < 5.5 ? 480 : road < 10 ? 270 : 190
+    const cruise = IDLE + road * perMs + Math.max(0, road > 0.2 ? drive.accel * Math.sign(drive.speed) : 0) * 250
     const target = !e.on ? 0 : cranking ? 230 : running < CRANK + 0.5 ? 1600 : s.rev ? 6900 : Math.min(5200, cruise)
     const rate = target > e.rpm ? (s.rev ? 6500 : 5000) : e.on ? 2600 : 1400
     e.prev = e.rpm
@@ -554,8 +588,8 @@ export function Car() {
     const amp = !e.on ? 0 : cranking ? 0.0045 : 0.0009 + load * 0.0009
     const hz = cranking ? 7.5 : 11 + load * 30
     const shake = amp * (Math.sin(now * Math.PI * 2 * hz) + 0.5 * Math.sin(now * Math.PI * 2 * hz * 1.73))
-    r.car.rotation.z = e.roll + shake
-    r.car.rotation.x = e.pitch + shake * 0.35
+    r.car.rotation.z = e.roll + shake + q.r
+    r.car.rotation.x = e.pitch + shake * 0.35 + q.p
     // Negative camber: the top of each wheel leans in towards the body.
     for (const w of r.wheels) w.pivot.rotation.z = w.side * a.camber
 

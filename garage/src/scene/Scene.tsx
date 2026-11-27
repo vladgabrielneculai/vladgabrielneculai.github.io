@@ -93,9 +93,10 @@ const HEAD = new THREE.Vector3(0.37, 1.15, -0.3)
 const AHEAD = new THREE.Vector3(0.3, 0.97, 1.4)
 const DOORWAY = new THREE.Vector3(2.4, 1.3, -0.55)
 const REACH = 0.15
-// Where the camera watches a drive out from.
-const DIRECTOR = new THREE.Vector3(1.8, 2.3, 8.6)
-const DIRECTOR_PHONE = new THREE.Vector3(1.2, 2.8, 11)
+// The rail the camera rides while the car drives out: low in front of it, then towards the
+// door. Phones stand further back to fit the narrow screen.
+const RAIL = new THREE.CatmullRomCurve3([new THREE.Vector3(2.4, 1.05, 6.6), new THREE.Vector3(2.1, 1.2, 1.5), new THREE.Vector3(1.8, 1.3, -3.5), new THREE.Vector3(1.2, 1.45, -8)])
+const RAIL_PHONE = new THREE.CatmullRomCurve3([new THREE.Vector3(2.2, 1.4, 10.5), new THREE.Vector3(1.9, 1.5, 4.5), new THREE.Vector3(1.6, 1.6, -1), new THREE.Vector3(1.1, 1.7, -6)])
 
 function Rig() {
   const { camera, size } = useThree()
@@ -108,6 +109,7 @@ function Rig() {
   const leaving = useRef(false) // getting out through the driver's door
   const wasInside = useRef(false)
   const sheet = useStore((s) => s.sheet)
+  const cinema = useStore((s) => s.cinema)
   // Bumped when the car is back from a drive, to set the camera off for the current tab again.
   const [lap, setLap] = useState(0)
   const wasDriving = useRef(false)
@@ -207,12 +209,13 @@ function Rig() {
 
     // Keep the car clear of the copy: right of the headline on the home screen, left of the
     // content panel otherwise, and up on phones.
-    const panel = tab !== 'home'
+    const panel = tab !== 'home' && !cinema
     const playing = intro.t < INTRO_END
-    easing.damp(off.current, 'x', portrait || playing ? 0 : size.width * (panel ? 0.17 : -0.19), playing ? 0.01 : 0.3, dt)
+    // (during the drive the car has the whole, centred frame)
+    easing.damp(off.current, 'x', portrait || playing || cinema ? 0 : size.width * (panel ? 0.17 : -0.19), playing ? 0.01 : 0.3, dt)
     // On phones the car sits above the sheet; with the sheet swiped down it gets the screen back.
     const lifted = panel && sheet !== 'peek'
-    easing.damp(off.current, 'y', portrait ? size.height * (!lifted ? 0.14 : inside ? 0.3 : 0.27) : 0, 0.3, dt)
+    easing.damp(off.current, 'y', portrait && !cinema ? size.height * (!lifted ? 0.14 : inside ? 0.3 : 0.27) : 0, 0.3, dt)
     cam.fov = portrait ? 50 : inside ? 42 : 30
     cam.setViewOffset(size.width, size.height, off.current.x, off.current.y, size.width, size.height)
 
@@ -221,9 +224,13 @@ function Rig() {
     if (driving()) {
       wasDriving.current = true
       if (controls.current) controls.current.enabled = false
-      easing.damp3(cam.position, portrait ? DIRECTOR_PHONE : DIRECTOR, 0.6, dt)
-      rel.set(THREE.MathUtils.clamp(drive.x * 0.75, -6, 6), 0.9, Math.min(-2, drive.z - 1.5))
-      easing.damp3(look, rel, 0.45, dt)
+      // The camera glides along a rail from in front of the car towards the door as the car
+      // goes, keeping it in frame; once it is out on the street, the camera watches through
+      // the doorway.
+      const step = Math.min(dt, 1 / 20)
+      easing.damp3(cam.position, (portrait ? RAIL_PHONE : RAIL).getPoint(drive.cam, rel), 0.55, step)
+      rel.set(THREE.MathUtils.clamp(drive.x, -4.2, 4.2), 0.75 + drive.y, Math.max(drive.z, -16))
+      easing.damp3(look, rel, 0.3, step)
       cam.lookAt(look)
       return
     }
@@ -311,6 +318,8 @@ function Rig() {
 
 export function Scene() {
   const ready = useStore((s) => s.ready)
+  // Behind the black screen of the contact form there is nothing to draw.
+  const dark = useStore((s) => s.dark)
   // ?dpr=2 pins the resolution (used for captures); otherwise it adapts to the device.
   const pinned = Number(new URLSearchParams(location.search).get('dpr')) || 0
   const top = innerWidth < 768 ? 1.25 : 1.5
@@ -323,6 +332,7 @@ export function Scene() {
         const s = useStore.getState()
         if (s.tab === 'about' && s.open.doorFL && drive.phase === 'home') s.set({ tab: 'home' })
       }}
+      frameloop={dark ? 'never' : 'always'}
       dpr={dpr} gl={{ antialias: true, powerPreference: 'high-performance', toneMappingExposure: 0.82 }} camera={{ fov: 30, near: 0.04, far: 80, position: [0.6, 0.5, 11.2] }}>
       {/* Too slow: first render fewer pixels, then give up the mirrored floor. It never steps back
           up: changing resolution back and forth is itself a visible hitch. */}
