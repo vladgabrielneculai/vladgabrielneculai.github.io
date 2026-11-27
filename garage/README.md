@@ -12,7 +12,7 @@ Single-screen portfolio built around a real-time 3D model of my Mazda3 (Machine 
 
 ## Performance
 
-The scene adapts to the machine. It starts at up to 1.5x pixel density (1.25x on phones) with a mirrored floor on desktop. If frames drop, it first lowers the pixel density, then replaces the mirror with a plain glossy floor, which halves the drawing work. Phones start without the mirror. Add `?lite` to the address to force the lighter mode.
+The scene adapts to the machine. It starts at up to 1.5x pixel density (1.25x on phones) with a mirrored floor on desktop. If frames drop, it first lowers the pixel density, then replaces the mirror with a plain glossy floor, which halves the drawing work. Phones start without the mirror. Add `?lite` to the address to force the lighter mode. Nothing is shown until it is ready to run smoothly: the app's code downloads alongside its content, desktops start downloading the Mazda with the page itself, and all three cars load together, after which every shader is compiled and every texture uploaded (the street behind the shutter and the passing cars too) behind the loading screen, so nothing stalls a frame the first time it appears.
 
 ## Stack
 

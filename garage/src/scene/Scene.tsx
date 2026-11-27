@@ -115,6 +115,42 @@ function Tilt({ children }: { children: React.ReactNode }) {
   return <group ref={group}>{children}</group>
 }
 
+// Before the garage is shown: every shader compiled and every texture on the GPU, including
+// what is hidden for now (the street behind the shutter, the passing cars), so nothing
+// stalls a frame the first time it appears. Then the loading screen lifts.
+function Warmup() {
+  const { gl, scene, camera } = useThree()
+  useEffect(() => {
+    let cancelled = false
+    // give the street a couple of frames to paint its textures and mount the passing cars
+    const wait = (n: number) => new Promise<void>((done) => (n <= 0 ? done() : requestAnimationFrame(() => wait(n - 1).then(done))))
+    ;(async () => {
+      await wait(3)
+      const hidden: THREE.Object3D[] = []
+      scene.traverse((o) => {
+        if (!o.visible) {
+          hidden.push(o)
+          o.visible = true
+        }
+        for (const m of [(o as THREE.Mesh).material].flat())
+          if (m) for (const v of Object.values(m)) if (v instanceof THREE.Texture) gl.initTexture(v)
+      })
+      try {
+        await gl.compileAsync(scene, camera)
+      } catch {
+        // compiling up front is only an optimisation
+      }
+      for (const o of hidden) o.visible = false
+      await wait(2)
+      if (!cancelled) useStore.getState().set({ ready: true })
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [gl, scene, camera])
+  return null
+}
+
 // Driver's seat (left-hand drive): where the camera sits for "About me", what it looks at,
 // and the point outside the open door it passes through on the way in.
 const HEAD = new THREE.Vector3(0.37, 1.15, -0.3)
@@ -367,7 +403,8 @@ export function Scene() {
       dpr={dpr} gl={{ antialias: true, powerPreference: 'high-performance', toneMappingExposure: 0.82 }} camera={{ fov: 30, near: 0.04, far: 80, position: [0.6, 0.5, 11.2] }}>
       {/* Too slow: first render fewer pixels, then give up the mirrored floor. It never steps back
           up: changing resolution back and forth is itself a visible hitch. */}
-      {!pinned && (
+      {/* (it only starts watching once the garage is on screen: the warm-up frames are slow) */}
+      {!pinned && ready && (
         <PerformanceMonitor
           onDecline={() =>
             setDpr((d) => {
@@ -379,19 +416,16 @@ export function Scene() {
         />
       )}
       <Tilt>
+        {/* everything loads together, then warms up, behind the loading screen */}
         <Suspense fallback={null}>
           <Garage />
           <Bvh firstHitOnly>
             <Car />
           </Bvh>
           <GroundShadow />
+          <Display />
+          <Warmup />
         </Suspense>
-        {/* The other cars load once the Mazda is on screen, so they never hold up the opening. */}
-        {ready && (
-          <Suspense fallback={null}>
-            <Display />
-          </Suspense>
-        )}
       </Tilt>
       <Rig />
     </Canvas>

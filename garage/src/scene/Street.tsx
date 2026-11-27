@@ -4,7 +4,7 @@
 // All artwork is original and drawn here.
 import { useGLTF } from '@react-three/drei'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { drive } from '../drive'
 import { makeEngine, rain, rattle, type Engine } from '../sound'
@@ -1422,12 +1422,8 @@ export function Street({ room }: { room: Room }) {
   const sweep = useRef<THREE.MeshBasicMaterial>(null)
   const sweepMesh = useRef<THREE.Mesh>(null)
   const traffic = useRef<Traffic>({ x: 0, lane: 0, model: 0, colour: PAINTS[0], id: 0, wait: 1.5, live: false })
-  // The passing cars are only loaded once the door has been opened.
-  const shutter = useStore((s) => s.shutter)
-  const [opened, setOpened] = useState(false)
-  useEffect(() => {
-    if (shutter) setOpened(true)
-  }, [shutter])
+  // (The passing cars load with the parked ones, the same two models; they only drive by
+  // while the door is open, since the street is only updated then.)
   // ?car=x,lane,model,paint holds a passing car in place (used for captures).
   const pinned = useMemo(() => new URLSearchParams(location.search).get('car')?.split(',').map(Number), [])
   const down = useRef<[number, number]>([0, 0])
@@ -1611,11 +1607,9 @@ export function Street({ room }: { room: Room }) {
         <lineSegments geometry={a.rainGeo} material={a.rain} position={[0, 0, wall]} frustumCulled={false} visible={weather === 'rain'} />
         <points geometry={a.flakeGeo} material={a.flakes} position={[0, 0, wall]} frustumCulled={false} visible={weather === 'snow' || weather === 'sakura'} />
 
-        {opened && (
-          <Suspense fallback={null}>
-            <Cars a={a} traffic={traffic} door={k} wall={wall} />
-          </Suspense>
-        )}
+        <Suspense fallback={null}>
+          <Cars a={a} traffic={traffic} door={k} wall={wall} />
+        </Suspense>
       </group>
     </>
   )

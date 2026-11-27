@@ -489,7 +489,9 @@ function SpareWheels({ wheel, radius, width }: { wheel: THREE.Object3D; radius: 
 
 export function Car() {
   const { scene } = useGLTF(MODEL, false, true)
-  const r = useMemo(() => rig(scene), [scene])
+  // Rigged once per loaded model: React may render this more than once before it mounts (when
+  // something beside it is still loading), and rigging changes the model in place.
+  const r = useMemo(() => (scene.userData.rig ??= rig(scene)) as ReturnType<typeof rig>, [scene])
   const v = useRef({ drop: 0, camber: 0, lights: 0 })
   // The engine: whether it is running, since when, its speed, throttle, and how the body moves
   // on its mounts and springs.
@@ -499,10 +501,6 @@ export function Car() {
   const mover = useRef<THREE.Group>(null)
   const bases = useMemo(() => r.wheels.map((w) => w.pivot.position.clone()), [r])
   const sus = useRef({ p: 0, pv: 0, r: 0, rv: 0 }) // body pitch and roll, and how fast they change
-
-  useEffect(() => {
-    useStore.getState().set({ ready: true })
-  }, [])
 
   useFrame(({ camera }, dt) => {
     const s = useStore.getState()
